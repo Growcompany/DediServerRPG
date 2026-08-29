@@ -117,19 +117,6 @@ AnimBP는 로코모션 최종 포즈 앞에 `FullBody` 슬롯을 두고 전투 �
 
 재현 조건과 선택 근거는 [트러블슈팅 문서](Docs/Portfolio/TROUBLESHOOTING.md)에 자세히 기록했습니다.
 
-## 최근 검증 결과
-
-- `DediServerRPGEditor Win64 Development`: 빌드 성공
-- `DediServerRPG Win64 DebugGame`: 빌드 성공
-- 4프로세스 E2E: 서버 Clear, 클라이언트 4개 모두 Clear
-- 부활: 트리거 및 성공 확인
-- 관문: 진입 1회, 우회 0회, 보스 기상 1회
-- 전투: 적 12명 처치, 일반 적 근접 타격 75회
-- 맵 검사: Static Mesh 751, PlayerStart 4, Nav Bounds 1, 스폰 문 10
-- 최종 로그: 프로젝트 자산 누락, AI 런타임 실패, 크래시 신호 각 0건
-
-수치의 원문과 검증 범위는 [검증 문서](Docs/Portfolio/VERIFICATION.md)에서 확인할 수 있습니다.
-
 ## 확인된 한계
 
 - 사람 4인 파티 검증은 아직 0회입니다. 현재 매치 수치는 봇 기반이며, 출혈 만료와 HUD 카운트다운은 실제 화면으로 수동 확인하지 못했습니다.
