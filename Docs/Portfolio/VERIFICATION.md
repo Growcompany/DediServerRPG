@@ -53,7 +53,7 @@ DSTR_SPAWN_POINTS Doors=10 Usable=2 Rule=Tag
 DSTR_NAV_PROBE_DONE Doors=10 Usable=2 Attempts=1
 ```
 
-`Usable=2`는 성공 기준이 아니라 확인된 레벨 한계입니다. 자세한 비교는 [NavMesh 트러블슈팅](TROUBLESHOOTING.md#8-출시-맵-navmesh가-여러-섬으로-분리)에 기록했습니다.
+`Usable=2`는 성공 기준이 아니라 확인된 레벨 아트 한계입니다. 네트워크 트러블슈팅과는 별도 범위로 관리합니다.
 
 ## 최종 로그 검사
 

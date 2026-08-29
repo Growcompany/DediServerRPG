@@ -102,18 +102,18 @@ AnimBP는 로코모션 최종 포즈 앞에 `FullBody` 슬롯을 두고 전투 �
 | HUD/ViewModel | [`UI`](Source/DediServerRPG/Private/UI) |
 | 동적 관문 | [`DSTRBossGate.cpp`](Source/DediServerRPG/Private/World/DSTRBossGate.cpp) |
 
-## 대표 트러블슈팅
+## 대표 네트워크 트러블슈팅
 
 | 문제 | 원인 | 적용한 해결 |
 |---|---|---|
 | 예측 클라이언트에서도 타격 타이머 실행 | 표현 재생과 권한 판정이 섞임 | 타격 예약은 Authority에서만 수행 |
+| 클라이언트에서 ASC 초기화 시점 불일치 | Pawn과 PlayerState의 복제 순서가 다름 | ASC는 PlayerState가 소유하고 `PossessedBy`/`OnRep_PlayerState` 양쪽에서 연결 |
 | 빠른 연속 액션이 누락되거나 중복 재생 | 순간 RPC만으로 상태 복구 불가 | `Action / Sequence / Variant` RepNotify + 로컬 예측 정합 |
-| 부활 직후 즉시 재다운 | 회복 프레임과 후속 피해가 겹침 | 2.5초 무적 GameplayEffect 적용 |
 | 막힌 공격에도 타격 효과 출력 | 시도와 확정 결과를 구분하지 않음 | `ApplyDamage == true` 이후에만 피드백 재생 |
-| 전투 몽타주가 로코모션에 반영되지 않음 | AnimGraph에 슬롯 경로가 없음 | 최종 포즈 앞 `FullBody` 슬롯을 에디터 C++로 삽입 |
+| 오래된 부활 요청이 적용될 위험 | 클라이언트 상태와 서버 상태가 달라질 수 있음 | 서버가 대상·다운·탈락·거리 조건을 다시 검사 |
+| 카운트다운 값의 드리프트와 반복 복제 | 남은 초를 상태처럼 전송 | 종료 서버 시각만 복제하고 각 클라이언트가 계산 |
+| 접속 직후 준비 상태가 너무 일찍 확정 | PlayerState와 비주얼 준비가 비동기 | 두 조건 완료 후 Server RPC, 서버가 전원 준비를 재검사 |
 | 스폰 직후 적의 첫 액션이 보이지 않음 | RepNotify가 비동기 비주얼보다 먼저 도착 | 비주얼 적용 직후 활성 복제 액션 재생 |
-| E2E 봇이 전투 중 픽업으로 이탈 | 픽업과 적 추적 우선순위 충돌 | 적 교전 중 픽업 분기 차단 |
-| 문 10개 중 2개만 완전 경로 | 출시 맵의 베이크 NavMesh가 섬으로 분리 | 세 방법을 실측하고 레벨 아트 작업으로 이관 |
 
 재현 조건과 선택 근거는 [트러블슈팅 문서](Docs/Portfolio/TROUBLESHOOTING.md)에 자세히 기록했습니다.
 
@@ -132,12 +132,11 @@ AnimBP는 로코모션 최종 포즈 앞에 `FullBody` 슬롯을 두고 전투 �
 
 ## 확인된 한계
 
-- 출시 맵의 NavMesh는 섬으로 나뉘어 스폰 문 10개 중 2개만 조우 원점까지 완전한 경로를 가집니다. 계단 포함 여부, NavLinkProxy, 재베이크를 비교했지만 코드 설정만으로 해결되지 않았으며, 보이는 구조와 충돌을 함께 수정하는 레벨 아트 작업이 남아 있습니다.
-- 관문은 `bDynamicObstacle = true`, `NavArea_Null`, 충돌/내비 관련성 동시 전환을 사용합니다. 다만 위 NavMesh 섬 때문에 연결된 양쪽 지점에서 전체 카빙 전이를 검증할 수는 없습니다.
 - 사람 4인 파티 검증은 아직 0회입니다. 현재 매치 수치는 봇 기반이며, 출혈 만료와 HUD 카운트다운은 실제 화면으로 수동 확인하지 못했습니다.
 - 일회성 타격 연출 13종은 unreliable multicast를 유지합니다. 유실돼도 게임 상태에 영향을 주지 않는 시각·청각 피드백으로 한정했습니다.
-- UI는 C++ `WidgetTree` 기반이라 디자이너 편집성이 낮고, 접속은 OnlineSubsystem 세션이 아닌 IP:포트 방식입니다.
+- 접속은 OnlineSubsystem 세션 검색이 아닌 IP:포트 직접 접속 방식입니다.
 - Epic Launcher 배포 엔진에서는 독립 `Server` 타깃을 만들 수 없어 Editor의 `-server -nullrhi`로 E2E를 수행했습니다. 독립 서버 패키징에는 소스 빌드 엔진이 필요합니다.
+- 출시 맵의 NavMesh는 스폰 문 10개 중 2개만 완전 경로를 가지며, 이 문제는 레벨 아트 작업으로 분리했습니다.
 
 ## 공개 범위
 
