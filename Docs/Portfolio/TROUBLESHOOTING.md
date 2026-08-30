@@ -64,54 +64,7 @@ Dedicated Server가 애니메이션 자산을 로드하지 않는 경계를 지�
 
 관련 코드: [`DSTRCombatPresentation.h`](../../Source/DediServerRPG/Public/Presentation/DSTRCombatPresentation.h), [`DSTRCombatActionReconciliation.cpp`](../../Source/DediServerRPG/Private/Combat/DSTRCombatActionReconciliation.cpp)
 
-## 4. 서버가 거부한 공격에도 클라이언트 피드백이 보임
-
-### 문제
-
-공격 시도만으로 타격 FX와 사운드를 보내면 잠든 보스, 무적, 사망 대상처럼 서버가 피해를 거부한 경우에도 성공한 공격처럼 보입니다.
-
-### 해결
-
-`UDSTRCombatLibrary::ApplyDamage`가 실제 GameplayEffect 적용 여부를 `bool`로 반환합니다. Authority 어빌리티는 반환값이 `true`일 때만 위협도와 `HitDealt` 피드백을 발생시킵니다.
-
-피드백은 서버 확정 결과의 소비자이며 피해 판정의 근거가 아닙니다. 일회성 FX·SFX는 유실돼도 게임 상태가 달라지지 않으므로 unreliable multicast를 유지합니다.
-
-관련 코드: [`DSTRCombatLibrary.cpp`](../../Source/DediServerRPG/Private/Combat/DSTRCombatLibrary.cpp), [`DSTRBasicAttackAbility.cpp`](../../Source/DediServerRPG/Private/AbilitySystem/Abilities/DSTRBasicAttackAbility.cpp)
-
-## 5. 부활 요청 시점과 서버 상태가 달라질 수 있음
-
-### 문제
-
-클라이언트가 상호작용을 시작한 뒤 서버에서 대상이 탈락하거나 거리가 벌어질 수 있습니다. 클라이언트가 선택한 대상과 상태를 그대로 신뢰하면 오래된 요청이 적용될 수 있습니다.
-
-### 해결
-
-- 부활 실행 시 서버가 가까운 대상을 다시 찾습니다.
-- 자기 자신 여부, 시전자 다운 여부, 대상 다운 여부, 탈락 여부와 실제 거리를 다시 검사합니다.
-- 검사를 통과한 서버만 Dead 효과를 제거하고 체력 회복 GameplayEffect를 적용합니다.
-- 부활 직후 겹쳐 들어온 공격으로 재다운되지 않도록 2.5초 무적 GameplayEffect도 서버가 부여합니다.
-
-클라이언트 요청은 의도만 전달하고 대상 선택과 상태 변경은 서버가 현재 월드 상태로 다시 계산합니다.
-
-관련 코드: [`DediServerRPGCharacter.cpp`](../../Source/DediServerRPG/DediServerRPGCharacter.cpp), [`DSTRGameplayEffects.cpp`](../../Source/DediServerRPG/Private/AbilitySystem/DSTRGameplayEffects.cpp)
-
-## 6. 남은 초를 계속 복제하면 드리프트와 갱신 비용이 생김
-
-### 문제
-
-로비 카운트다운과 45초 출혈 시간을 매초 값으로 복제하면 클라이언트별 도착 시점에 따라 표시가 어긋나고 같은 상태를 반복 전송하게 됩니다.
-
-### 해결
-
-- 서버는 `CountdownEndServerTime`과 `BleedOutEndServerTime`이라는 절대 마감 시각만 복제합니다.
-- 클라이언트는 `GameState::GetServerWorldTimeSeconds()`와 마감 시각의 차이로 남은 시간을 계산합니다.
-- 시작, 취소, 다운 해제처럼 의미 있는 상태 변경 때만 마감 시각을 갱신하고 `ForceNetUpdate`합니다.
-
-UI 갱신 주기와 네트워크 복제 주기를 분리하면서 모든 클라이언트가 같은 서버 시각을 기준으로 표시합니다.
-
-관련 코드: [`DSTRGameState.cpp`](../../Source/DediServerRPG/Private/Game/DSTRGameState.cpp), [`DSTRPlayerState.cpp`](../../Source/DediServerRPG/Private/Player/DSTRPlayerState.cpp)
-
-## 7. 접속 완료와 플레이 준비 완료는 같은 시점이 아님
+## 4. 접속 완료와 플레이 준비 완료는 같은 시점이 아님
 
 ### 문제
 
@@ -123,25 +76,11 @@ PlayerController가 생성됐더라도 PlayerState 복제와 클라이언트 비
 2. `BeginPlay`, `OnRep_PlayerState`, 비동기 로드 콜백에서 같은 준비 확인 함수를 호출합니다.
 3. 두 조건이 충족되면 한 번만 `Server_ReportPresentationReady`를 보냅니다.
 4. 서버는 `PlayerState::bPresentationReady`를 변경하고, GameMode가 방장·페이즈·인원·전원 준비를 다시 확인한 뒤 카운트다운을 시작합니다.
-5. 10초 watchdog은 강제 진행하지 않고 어떤 조건이 늦었는지만 로그로 남깁니다.
+5. watchdog은 강제 진행하지 않고 어떤 조건이 늦었는지만 로그로 남깁니다.
 
-최신 4클라이언트 실행에서는 동시에 시작한 클라이언트 3개가 10초 경계의 watchdog을 기록했지만 약 0.2초 뒤 모두 준비를 보고했고, 서버와 네 클라이언트가 Clear에 도달했습니다.
+전투 액션이 AnimBP보다 먼저 도착한 경우에는 비주얼 적용 직후 현재 `ReplicatedCombatAction`을 다시 확인합니다. 활성 액션이 남아 있으면 로컬 재생 상태를 초기화하고 같은 `Action / Variant`를 적용합니다. 순간 RPC를 다시 보내지 않고 복제된 현재 상태에서 표현을 복구하므로 접속, PlayerState, 자산 로드의 도착 순서에 의존하지 않습니다.
 
-관련 코드: [`DSTRPlayerController.cpp`](../../Source/DediServerRPG/Private/Player/DSTRPlayerController.cpp), [`DediServerRPGGameMode.cpp`](../../Source/DediServerRPG/DediServerRPGGameMode.cpp)
-
-## 8. RepNotify가 클라이언트 자산 로드보다 먼저 도착함
-
-### 문제
-
-런타임에 생성된 적의 전투 액션은 정상 복제됐지만, 메시와 AnimBP의 비동기 로드가 끝나기 전에 RepNotify가 실행되면 재생할 AnimInstance가 없어 첫 몽타주가 누락됐습니다.
-
-### 해결
-
-적의 `ApplyVisualAssets`가 메시와 AnimBP 적용을 마친 뒤 현재 `ReplicatedCombatAction`을 다시 확인합니다. 활성 액션이 남아 있으면 로컬 재생 상태를 초기화하고 동일한 `Action / Variant`를 재생합니다.
-
-순간 RPC를 재전송하는 대신 이미 복제된 현재 상태에서 표현을 복구하므로 네트워크와 자산 로드의 도착 순서에 의존하지 않습니다. 최종 4클라이언트 로그에서 적 전투 애니메이션 누락 경고는 0건이었습니다.
-
-관련 코드: [`DSTREnemyCharacter.cpp`](../../Source/DediServerRPG/Private/Enemy/DSTREnemyCharacter.cpp), [`DSTRVisualAssetSubsystem.cpp`](../../Source/DediServerRPG/Private/Presentation/DSTRVisualAssetSubsystem.cpp)
+관련 코드: [`DSTRPlayerController.cpp`](../../Source/DediServerRPG/Private/Player/DSTRPlayerController.cpp), [`DediServerRPGGameMode.cpp`](../../Source/DediServerRPG/DediServerRPGGameMode.cpp), [`DSTREnemyCharacter.cpp`](../../Source/DediServerRPG/Private/Enemy/DSTREnemyCharacter.cpp)
 
 ## 전송 방식 선택 기준
 
@@ -152,11 +91,3 @@ PlayerController가 생성됐더라도 PlayerState 복제와 클라이언트 비
 | 전투 동작 | `Action / Sequence / Variant` RepNotify | 연속 액션과 예측 정합 필요 |
 | 로비 시작·상호작용 요청 | 서버 실행 경로에서 재검사 | 클라이언트 값을 그대로 신뢰하지 않음 |
 | 일회성 타격 FX·SFX | unreliable multicast | 유실돼도 게임 상태에 영향 없음 |
-
-## 검증 범위
-
-- 서버 1개와 자동 플레이 클라이언트 4개가 모두 `Clear`에 도달했습니다.
-- 부활 트리거/성공, 관문 진입, 보스 기상과 적 근접 공격을 로그로 확인했습니다.
-- 사람 4인 파티 검증은 아직 0회이며, 출혈 만료와 HUD 카운트다운은 실제 화면으로 수동 확인하지 못했습니다.
-
-AnimBP 그래프 제작, E2E 드라이버 행동, NavMesh 섬 문제는 네트워크 트러블슈팅 본문에서 제외했습니다. 해당 사실은 [아키텍처](ARCHITECTURE.md)와 [검증 기록](VERIFICATION.md)에 필요한 범위만 남겼습니다.
