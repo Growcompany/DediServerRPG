@@ -42,6 +42,7 @@ void ADSTRGameState::StartMatchFlow()
 	MatchStartServerTime = GetServerWorldTimeSeconds();
 }
 
+// 권한 + 합법 전이 통과 시에만 복제 프로퍼티 기록
 bool ADSTRGameState::AdvancePhase(const EDSTRMatchPhase NewPhase)
 {
 	if (!HasAuthority() || !IsValidPhaseTransition(MatchPhase, NewPhase))

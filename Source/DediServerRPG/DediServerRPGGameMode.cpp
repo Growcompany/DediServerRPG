@@ -181,6 +181,7 @@ bool ADediServerRPGGameMode::ShouldAutoStart(const FString& CommandLine)
 	return FParse::Param(*CommandLine, TEXT("DSTRAutoStart"));
 }
 
+// 요청자 불신. 호스트·페이즈·인원·준비 수 서버 재검사
 bool ADediServerRPGGameMode::TryStartMatchByHost(APlayerController* Requester)
 {
 	const ADSTRGameState* State = GetGameState<ADSTRGameState>();

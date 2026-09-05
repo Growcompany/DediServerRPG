@@ -16,6 +16,7 @@ UDSTRAttributeSet::UDSTRAttributeSet()
 	InitDamage(0.0f);
 }
 
+// 어느 경로로 바뀌든 여기서 범위 클램프
 void UDSTRAttributeSet::PreAttributeChange(
 	const FGameplayAttribute& Attribute,
 	float& NewValue)
@@ -36,6 +37,7 @@ void UDSTRAttributeSet::PreAttributeChange(
 	}
 }
 
+// 비복제 메타 Damage → 실제 Health 반영 유일 지점
 void UDSTRAttributeSet::PostGameplayEffectExecute(
 	const FGameplayEffectModCallbackData& Data)
 {
@@ -43,7 +45,7 @@ void UDSTRAttributeSet::PostGameplayEffectExecute(
 
 	if (Data.EvaluatedData.Attribute == GetDamageAttribute())
 	{
-		// 피해 메타 속성은 체력에 반영한 뒤 즉시 비운다.
+		// 메타 Damage → Health 반영 후 즉시 0
 		const float IncomingDamage = GetDamage();
 		SetDamage(0.0f);
 		if (IncomingDamage > 0.0f)

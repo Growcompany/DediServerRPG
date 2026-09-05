@@ -156,6 +156,7 @@ void UDSTRBTService_CombatContext::TickNode(
 		? Cast<ADSTREnemyCharacter>(Controller->GetPawn())
 		: nullptr;
 	UBlackboardComponent* Blackboard = OwnerComp.GetBlackboardComponent();
+	// 감지는 서버 전용. 클라는 블랙보드 갱신 불가
 	if (!Enemy || !Enemy->HasAuthority() || !Blackboard)
 	{
 		return;
@@ -204,7 +205,7 @@ void UDSTRBTService_CombatContext::TickNode(
 		? RecommendBossSkill(*Enemy, Target, Distance2D)
 		: EDSTRBossSkill::None;
 
-	// 서비스는 감지값만 갱신하고 행동 우선순위는 트리가 결정한다.
+	// 서비스는 감지값만 갱신. 우선순위 결정은 트리
 	Blackboard->SetValueAsObject(DSTRAIBlackboardKeys::TargetActor, Target);
 	Blackboard->SetValueAsBool(DSTRAIBlackboardKeys::HasTarget, Target != nullptr);
 	Blackboard->SetValueAsFloat(DSTRAIBlackboardKeys::Distance2D, Distance2D);

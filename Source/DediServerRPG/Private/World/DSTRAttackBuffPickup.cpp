@@ -70,6 +70,7 @@ void ADSTRAttackBuffPickup::EndPlay(const EEndPlayReason::Type EndPlayReason)
 	Super::EndPlay(EndPlayReason);
 }
 
+// 픽업 소비도 서버 확정. 거리·상태 재검사 후 적용
 bool ADSTRAttackBuffPickup::TryConsume(ADediServerRPGCharacter* Player)
 {
 	if (!HasAuthority() || !Player)

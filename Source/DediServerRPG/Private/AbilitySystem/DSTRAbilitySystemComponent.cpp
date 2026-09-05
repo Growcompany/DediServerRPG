@@ -38,6 +38,7 @@ UDSTRAbilitySystemComponent::UDSTRAbilitySystemComponent()
 	SetIsReplicatedByDefault(true);
 }
 
+// 초기화 중복 호출돼도 플래그로 1회만 부여
 void UDSTRAbilitySystemComponent::GiveStartupAbilities()
 {
 	if (bStartupAbilitiesGiven || !IsOwnerActorAuthoritative())

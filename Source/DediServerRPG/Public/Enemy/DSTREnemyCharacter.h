@@ -170,6 +170,7 @@ private:
 		EDSTRCombatFeedback Feedback,
 		const AActor* InstigatorActor);
 
+	// Sequence 매번 증가 → 같은 공격 연속에도 RepNotify 발화
 	UPROPERTY(ReplicatedUsing = OnRep_CombatAction)
 	FDSTRReplicatedCombatAction ReplicatedCombatAction;
 

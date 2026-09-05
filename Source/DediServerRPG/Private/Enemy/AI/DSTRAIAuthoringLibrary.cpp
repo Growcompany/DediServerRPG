@@ -184,13 +184,14 @@ namespace
 	{
 		Tree.Modify();
 		Tree.BlackboardAsset = &Blackboard;
-		// 셀렉터 순서가 곧 행동 우선순위다.
+		// 셀렉터 순서 = 행동 우선순위
 		UBTComposite_Selector* Root = NewObject<UBTComposite_Selector>(&Tree);
 		Tree.RootNode = Root;
 		Root->Children.Reset();
 		Root->Services.Reset();
 		Root->Services.Add(NewObject<UDSTRBTService_CombatContext>(&Tree));
 
+		// 첫 만족 분기 하나만 실행 → 생존 상태를 최상단에
 		AddBranch(Tree, *Root,
 			NewHoldTask(Tree, TEXT("Dead"), EDSTREnemyAIState::Dead, true, true, false),
 			{{DSTRAIBlackboardKeys::IsDead, true}});
@@ -221,6 +222,7 @@ namespace
 			{DSTRAIBlackboardKeys::HasTarget, true},
 			{DSTRAIBlackboardKeys::HasRecommendedBossSkill, true}});
 
+		// 보스 분기 통과 후에만 일반 공격 조건 평가
 		UDSTRBTTask_ActivateAttack* Melee =
 			NewObject<UDSTRBTTask_ActivateAttack>(&Tree);
 		Melee->Configure(false);

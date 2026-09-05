@@ -58,6 +58,7 @@ void UDSTRBasicAttackAbility::ActivateAbility(
 		&UDSTRBasicAttackAbility::FinishRecovery,
 		FDSTRCombatPresentation::GetCancelDelay(EDSTRCombatAction::BasicAttack, ActiveVariant),
 		false);
+	// 클라는 이 관문 미통과 → 몽타주만. 판정은 서버
 	if (FDSTRCombatPresentation::ShouldScheduleAuthorityImpact(Avatar->HasAuthority()))
 	{
 		World->GetTimerManager().SetTimer(

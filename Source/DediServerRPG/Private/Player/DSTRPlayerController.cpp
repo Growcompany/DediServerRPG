@@ -36,18 +36,21 @@ void ADSTRPlayerController::BeginPlay()
 			Controller->ReportPresentationReadyIfLoaded();
 		}
 	});
+	// 콜백 생략 경로 존재 → 현재 조건 즉시 1회 확인
 	ReportPresentationReadyIfLoaded();
 	GetWorldTimerManager().SetTimer(
 		PresentationReadyTimer, this, &ADSTRPlayerController::ReportReadyWatchdog,
 		FDSTRLobbyViewModel::ReadyPendingWatchdogSeconds, false);
 }
 
+// PlayerState 지연 도착도 같은 함수로 흡수
 void ADSTRPlayerController::OnRep_PlayerState()
 {
 	Super::OnRep_PlayerState();
 	ReportPresentationReadyIfLoaded();
 }
 
+// 진입 경로 여럿 → 플래그로 서버 보고 1회 보장
 void ADSTRPlayerController::ReportPresentationReadyIfLoaded()
 {
 	if (bPresentationReadySent || !IsLocalController())
@@ -95,6 +98,7 @@ void ADSTRPlayerController::Server_ReportPresentationReady_Implementation()
 	UE_LOG(LogDSTR, Log, TEXT("DSTR_LOBBY_READY PlayerId=%d"), State->GetPlayerId());
 }
 
+// 클라는 요청만. 인가는 서버 TryStartMatchByHost에서 재검사
 bool ADSTRPlayerController::Server_RequestStartMatch_Validate()
 {
 	return true;

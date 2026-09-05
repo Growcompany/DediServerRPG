@@ -6,11 +6,13 @@
 #include "GameFramework/GameStateBase.h"
 #include "Net/UnrealNetwork.h"
 
+// ASC 소유자 = PlayerState (Pawn 소유면 리스폰 시 상태 소실)
 ADSTRPlayerState::ADSTRPlayerState()
 {
 	NetUpdateFrequency = 10.0f;
 
 	AbilitySystemComponent = CreateDefaultSubobject<UDSTRAbilitySystemComponent>(TEXT("AbilitySystemComponent"));
+	// Mixed: GE는 소유 클라에만 복제 (대역폭 절약)
 	AbilitySystemComponent->SetReplicationMode(EGameplayEffectReplicationMode::Mixed);
 
 	AttributeSet = CreateDefaultSubobject<UDSTRAttributeSet>(TEXT("AttributeSet"));

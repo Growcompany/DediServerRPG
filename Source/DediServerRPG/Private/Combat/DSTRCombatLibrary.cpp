@@ -101,6 +101,7 @@ bool UDSTRCombatLibrary::ApplySlow(
 	return true;
 }
 
+// 타이머 경유 지연 도달 → 권한·대상 상태 재확인
 bool UDSTRCombatLibrary::ApplyDamage(
 	UAbilitySystemComponent* SourceASC,
 	UAbilitySystemComponent* TargetASC,
@@ -111,14 +112,14 @@ bool UDSTRCombatLibrary::ApplyDamage(
 		return false;
 	}
 
-	// 피해 확정은 소스 액터의 서버 권한에서만 수행한다.
+	// 피해 확정 = 소스 액터의 서버 권한에서만
 	const AActor* SourceAvatar = SourceASC->GetAvatarActor();
 	if (!SourceAvatar || !SourceAvatar->HasAuthority())
 	{
 		return false;
 	}
 
-	// 잠든 보스는 관문 진입 전 피해를 받지 않는다.
+	// 잠든 보스는 관문 진입 전 피해 무시
 	const ADSTREnemyCharacter* TargetEnemy = Cast<ADSTREnemyCharacter>(TargetASC->GetAvatarActor());
 	if (TargetEnemy
 		&& FDSTRDamageRules::IsImmuneWhileDormant(TargetEnemy->IsDormant(), TargetEnemy->IsBoss()))

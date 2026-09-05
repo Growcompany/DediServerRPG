@@ -7,6 +7,7 @@ bool FDSTREnemyAIRules::IsFacingTarget(const FVector& Forward, const FVector& To
 	return FDSTRCombatMath::IsInFrontCone(Forward, ToTarget, FacingToleranceDegrees);
 }
 
+// 사거리 안에서는 대상 고정 (매 틱 교체 방지)
 bool FDSTREnemyAIRules::ShouldSwitchTarget(
 	const float CurrentScore,
 	const float CandidateScore,

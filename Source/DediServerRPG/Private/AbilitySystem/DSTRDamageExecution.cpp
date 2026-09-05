@@ -35,6 +35,7 @@ UDSTRDamageExecution::UDSTRDamageExecution(const FObjectInitializer& ObjectIniti
 	RelevantAttributesToCapture.Add(DamageCapture().AttackPowerDef);
 }
 
+// 피해 계산은 여기서 종료. 출력은 메타 Damage 하나뿐
 void UDSTRDamageExecution::Execute_Implementation(
 	const FGameplayEffectCustomExecutionParameters& ExecutionParams,
 	FGameplayEffectCustomExecutionOutput& OutExecutionOutput) const

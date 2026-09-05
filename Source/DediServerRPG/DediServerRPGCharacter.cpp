@@ -240,6 +240,7 @@ UAbilitySystemComponent* ADediServerRPGCharacter::GetAbilitySystemComponent() co
 	return DSTRPlayerState ? DSTRPlayerState->GetAbilitySystemComponent() : nullptr;
 }
 
+// 서버 진입점. 클라는 OnRep_PlayerState
 void ADediServerRPGCharacter::PossessedBy(AController* NewController)
 {
 	Super::PossessedBy(NewController);
@@ -252,6 +253,7 @@ void ADediServerRPGCharacter::OnRep_PlayerState()
 	InitializeAbilitySystem();
 }
 
+// 두 경로 중 먼저 온 쪽이 호출. 같은 초기화로 수렴
 void ADediServerRPGCharacter::InitializeAbilitySystem()
 {
 	ADSTRPlayerState* DSTRPlayerState = GetPlayerState<ADSTRPlayerState>();
@@ -262,8 +264,9 @@ void ADediServerRPGCharacter::InitializeAbilitySystem()
 
 	if (UDSTRAbilitySystemComponent* ASC = DSTRPlayerState->GetDSTRAbilitySystemComponent())
 	{
+		// Owner = PlayerState 고정, Avatar만 현재 Pawn으로 재연결
 		ASC->InitAbilityActorInfo(DSTRPlayerState, this);
-		// 두 초기화 경로가 겹쳐도 델리게이트는 하나만 유지한다.
+		// 초기화 경로 2개가 겹쳐도 델리게이트는 1개 유지
 		if (UAbilitySystemComponent* PreviousASC = BoundAbilitySystemComponent.Get();
 			PreviousASC && DeadTagChangedHandle.IsValid())
 		{
@@ -286,6 +289,7 @@ void ADediServerRPGCharacter::InitializeAbilitySystem()
 					ASC->MakeEffectContext());
 			}
 		}
+		// 다운 중 합류 → 복제 태그로 표현 복구
 		if (IsDowned())
 		{
 			ApplyDownedPresentation();

@@ -734,6 +734,7 @@ void ADSTREnemyCharacter::PlayEnemyFeedbackLocal(
 	FDSTRCombatFeedbackPlayer::Play(GetWorld(), Request);
 }
 
+// 서버 전용. 클라는 OnRep_CombatAction으로 추종
 uint8 ADSTREnemyCharacter::StartCombatAction(const EDSTRCombatAction Action, const int32 ExplicitVariant)
 {
 	if (!HasAuthority())
@@ -749,7 +750,7 @@ uint8 ADSTREnemyCharacter::StartCombatAction(const EDSTRCombatAction Action, con
 	{
 		NextAttackVariant = static_cast<uint8>((static_cast<int32>(Variant) + 1) % VariantCount);
 	}
-	// 데디 서버는 애니메이션 대신 동작 정보만 복제한다.
+	// 데디 서버는 애니 대신 동작 정보만 복제
 	++ReplicatedCombatAction.Sequence;
 	ReplicatedCombatAction.Action = Action;
 	ReplicatedCombatAction.Variant = Variant;
@@ -772,6 +773,7 @@ uint8 ADSTREnemyCharacter::StartCombatAction(const EDSTRCombatAction Action, con
 	return Variant;
 }
 
+// 클라가 적 동작을 아는 유일한 경로
 void ADSTREnemyCharacter::OnRep_CombatAction()
 {
 	if (ReplicatedCombatAction.Action == EDSTRCombatAction::None)
@@ -884,6 +886,7 @@ void ADSTREnemyCharacter::OnRep_Boss()
 
 void ADSTREnemyCharacter::ApplyVisualAssets()
 {
+	// 데디 서버는 메시 없음 → 비주얼 적용 생략
 	if (!FDSTRVisualAssetRegistry::ShouldLoadVisualAssets(GetNetMode()))
 	{
 		return;
@@ -902,7 +905,7 @@ void ADSTREnemyCharacter::ApplyVisualAssets()
 		return;
 	}
 
-	// 복제 액션이 비주얼보다 먼저 도착했으면 준비 직후 재생한다.
+	// 복제 액션이 비주얼보다 먼저 왔으면 준비 직후 재생
 	if (ReplicatedCombatAction.Action != EDSTRCombatAction::None)
 	{
 		CurrentCombatAction = EDSTRCombatAction::None;
