@@ -6,6 +6,7 @@
 #include "AbilitySystem/DSTRGameplayTags.h"
 #include "Combat/DSTRCombatLibrary.h"
 #include "Combat/DSTRDamageRules.h"
+#include "Combat/DSTRHitDebug.h"
 #include "Combat/DSTRHitQuery.h"
 #include "Components/CapsuleComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
@@ -82,6 +83,13 @@ void UDSTRReckoningAbility::ExecuteBlast()
 		Character->GetActorForwardVector(),
 		FDSTRDamageRules::ReckoningRadius);
 
+	UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::IsEnabled()
+		? UDSTRHitDebugSubsystem::Get(World) : nullptr;
+	if (HitDebug)
+	{
+		HitDebug->Begin(
+			Character, BlastCenter, FDSTRDamageRules::ReckoningRadius, 0.0f, TEXT("Reckoning"));
+	}
 	TArray<ADSTREnemyCharacter*> Candidates;
 	FDSTRHitQuery::GatherEnemies(Character, BlastCenter, FDSTRDamageRules::ReckoningRadius, Candidates);
 	for (ADSTREnemyCharacter* Enemy : Candidates)
@@ -90,7 +98,15 @@ void UDSTRReckoningAbility::ExecuteBlast()
 		if (Distance > FDSTRDamageRules::ReckoningRadius
 			+ Enemy->GetCapsuleComponent()->GetScaledCapsuleRadius())
 		{
+			if (HitDebug)
+			{
+				HitDebug->SetVerdict(Character, Enemy, EDSTRHitVerdict::OutOfReach);
+			}
 			continue;
+		}
+		if (HitDebug)
+		{
+			HitDebug->SetVerdict(Character, Enemy, EDSTRHitVerdict::Hit);
 		}
 		UE_LOG(LogDSTR, Log, TEXT("DSTR_HIT Source=%s Target=%s Dist=%.0f Reach=%.0f Angle=%.0f Skill=Reckoning"),
 			*Character->GetName(), *Enemy->GetName(), Distance, FDSTRDamageRules::ReckoningRadius, 0.0f);
@@ -108,6 +124,10 @@ void UDSTRReckoningAbility::ExecuteBlast()
 			Enemy->PlayAbilityFeedback(
 				Enemy->GetActorLocation(), 220.0f, EDSTRCombatFeedback::HitDealt, Character);
 		}
+	}
+	if (HitDebug)
+	{
+		HitDebug->Commit(Character);
 	}
 }
 

@@ -2,6 +2,7 @@
 #include "DSTRLog.h"
 
 #include "Engine/Engine.h"
+#include "Game/DSTRServerStatusQuery.h"
 
 void UDSTRGameInstance::Init()
 {
@@ -20,8 +21,12 @@ FString UDSTRGameInstance::ConsumeConnectionError()
 	return Error;
 }
 
-void UDSTRGameInstance::HandleNetworkFailure(UWorld*, UNetDriver*, const ENetworkFailure::Type FailureType, const FString& ErrorString)
+void UDSTRGameInstance::HandleNetworkFailure(UWorld*, UNetDriver* Driver, const ENetworkFailure::Type FailureType, const FString& ErrorString)
 {
+	if (UDSTRServerStatusQuery::IsStatusDriver(Driver))
+	{
+		return;
+	}
 	LastConnectionError = ErrorString.IsEmpty() ? ENetworkFailure::ToString(FailureType) : ErrorString;
 	UE_LOG(LogDSTR, Warning, TEXT("DSTR_CONNECTION_FAILED Reason=%s"), *LastConnectionError);
 }

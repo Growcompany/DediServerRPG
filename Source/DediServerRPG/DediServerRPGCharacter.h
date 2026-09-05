@@ -54,7 +54,8 @@ class ADediServerRPGCharacter : public ACharacter,
 	UInputAction* BasicAttackAction;
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
-	UInputAction* MakeWayAction;
+	UInputAction* SmashAction;
+
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* FortifyAction;
@@ -67,6 +68,9 @@ class ADediServerRPGCharacter : public ACharacter,
 
 	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
 	UInputAction* InteractAction;
+
+	UPROPERTY(VisibleAnywhere, BlueprintReadOnly, Category = Input, meta = (AllowPrivateAccess = "true"))
+	UInputAction* SprintAction;
 
 public:
 	ADediServerRPGCharacter(const FObjectInitializer& ObjectInitializer);
@@ -86,6 +90,7 @@ public:
 	static constexpr float DefaultCameraPitch = -12.0f;
 
 	void PressAbilityInput(const FGameplayTag& InputTag);
+	void ReleaseAbilityInput(const FGameplayTag& InputTag);
 	void SetDesiredMoveDirection(const FVector& Direction) { DesiredMoveDirection = Direction; }
 	bool IsAbilityReady(const FGameplayTag& CooldownTag) const;
 
@@ -145,11 +150,13 @@ private:
 
 	void InitializeAbilitySystem();
 	void HandleBasicAttackInput();
-	void HandleMakeWayInput();
+	void HandleSmashInput();
 	void HandleFortifyInput();
 	void HandleChargeInput();
 	void HandleReckoningInput();
 	void HandleInteractInput();
+	void HandleSprintPressed();
+	void HandleSprintReleased();
 	void ClearWarningEffect();
 	TWeakObjectPtr<class UParticleSystemComponent> WarningEffectComponent;
 	FTimerHandle WarningEffectTimerHandle;

@@ -5,6 +5,7 @@
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/DSTRAttributeSet.h"
 #include "AbilitySystem/DSTRGameplayEffects.h"
+#include "Components/StaticMeshComponent.h"
 #include "DediServerRPGCharacter.h"
 #include "Enemy/DSTREnemyCharacter.h"
 #include "Engine/StaticMesh.h"
@@ -19,6 +20,7 @@
 #include "GameFramework/PlayerState.h"
 #include "HAL/PlatformMisc.h"
 #include "Kismet/GameplayStatics.h"
+#include "NavigationData.h"
 #include "NavigationPath.h"
 #include "NavigationSystem.h"
 #include "Misc/CommandLine.h"
@@ -30,6 +32,7 @@
 #include "UI/DSTRLobbyViewModel.h"
 #include "World/DSTRAttackBuffPickup.h"
 #include "World/DSTRBossGate.h"
+#include "World/DSTRBossRoomMarker.h"
 
 namespace
 {
@@ -38,6 +41,22 @@ namespace
 	constexpr float DoorNavProjectionExtent = 200.0f;
 	constexpr float NavProbeDelaySeconds = 4.0f;
 	constexpr float AutoStartRetrySeconds = 1.0f;
+	constexpr float EncounterNavRetrySeconds = 0.5f;
+	constexpr float EncounterNavMaxWaitSeconds = 5.0f;
+
+	// 내비 빌드 완료 전에 질의하면 경로가 전부 Partial로 나와 문·보스방 후보가 모두 탈락한다.
+	bool IsEncounterNavigationReady(UWorld* World, const FVector& Origin,
+		int32& OutNavData, bool& bOutBuilding, bool& bOutOriginOnNav)
+	{
+		UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+		OutNavData = Navigation ? Navigation->NavDataSet.Num() : 0;
+		bOutBuilding = Navigation && Navigation->IsNavigationBuildInProgress();
+		FNavLocation OriginOnNav;
+		const ANavigationData* AnyNavData = nullptr;
+		bOutOriginOnNav = Navigation && Navigation->ProjectPointToNavigation(
+			Origin, OriginOnNav, FVector(DoorNavProjectionExtent), AnyNavData);
+		return OutNavData > 0 && !bOutBuilding && bOutOriginOnNav;
+	}
 }
 
 ADediServerRPGGameMode::ADediServerRPGGameMode()
@@ -54,17 +73,80 @@ ADediServerRPGGameMode::ADediServerRPGGameMode()
 	DefaultPawnClass = ADediServerRPGCharacter::StaticClass();
 }
 
+void ADediServerRPGGameMode::InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage)
+{
+	Super::InitGame(MapName, Options, ErrorMessage);
+	RoomSession.bEnabled = FParse::Param(FCommandLine::Get(), TEXT("DSTRRoomServer"))
+		|| UGameplayStatics::ParseOption(Options, TEXT("DSTRRoomServer")) == TEXT("1");
+}
+
 void ADediServerRPGGameMode::PreLogin(
 	const FString& Options,
 	const FString& Address,
 	const FUniqueNetIdRepl& UniqueId,
 	FString& ErrorMessage)
 {
-	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
-	if (ErrorMessage.IsEmpty() && !CanAcceptPlayerCount(GetNumPlayers()))
+	if (UGameplayStatics::ParseOption(Options, TEXT("DSTRStatus")) == TEXT("1"))
 	{
-		ErrorMessage = TEXT("ServerFull");
+		FDSTRServerStatus Status;
+		Status.Players = GetNumPlayers();
+		Status.bManagedRoom = RoomSession.bEnabled;
+		Status.RoomId = RoomSession.RoomId;
+		Status.RoomName = RoomSession.bEnabled ? RoomSession.RoomName : FDSTRServerStatus::GetConfiguredRoomName();
+		if (const ADSTRGameState* State = GetGameState<ADSTRGameState>())
+		{
+			Status.Phase = State->GetMatchPhase();
+			Status.bCountdown = State->IsCountdownActive();
+		}
+		// A protocol reply closes this handshake before Welcome/Join can allocate a player.
+		ErrorMessage = Status.Encode();
+		return;
 	}
+	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	if (ErrorMessage.IsEmpty())
+	{
+		ErrorMessage = GetAdmissionError(Options);
+	}
+}
+
+FString ADediServerRPGGameMode::GetAdmissionError(const FString& Options)
+{
+	const FString RoomError = RoomSession.CheckLogin(FDSTRRoomRequest::FromOptions(Options));
+	if (!RoomError.IsEmpty())
+	{
+		return RoomError;
+	}
+	if (!CanAcceptPlayerCount(GetNumPlayers()))
+	{
+		return TEXT("ServerFull");
+	}
+	const ADSTRGameState* State = GetGameState<ADSTRGameState>();
+	if (State && (State->IsCountdownActive() || State->GetMatchPhase() != EDSTRMatchPhase::WaitingForPlayers))
+	{
+		return TEXT("MatchInProgress");
+	}
+	return FString();
+}
+
+APlayerController* ADediServerRPGGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal,
+	const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
+{
+	// Capacity or countdown may change while an accepted connection is loading the map.
+	ErrorMessage = GetAdmissionError(Options);
+	if (!ErrorMessage.IsEmpty())
+	{
+		return nullptr;
+	}
+	APlayerController* Controller = Super::Login(NewPlayer, InRemoteRole, Portal, Options, UniqueId, ErrorMessage);
+	if (Controller && RoomSession.Create(FDSTRRoomRequest::FromOptions(Options)))
+	{
+		if (ADSTRGameState* State = GetGameState<ADSTRGameState>())
+		{
+			State->SetRoomName(RoomSession.RoomName);
+		}
+		UE_LOG(LogDSTR, Log, TEXT("DSTR_ROOM_CREATED Id=%s Name=%s"), *RoomSession.RoomId, *RoomSession.RoomName);
+	}
+	return Controller;
 }
 
 void ADediServerRPGGameMode::PostLogin(APlayerController* NewPlayer)
@@ -174,6 +256,38 @@ void ADediServerRPGGameMode::Logout(AController* Exiting)
 		State->SetHostPlayerId(NextHost);
 	}
 	Super::Logout(Exiting);
+	if (GetNetMode() == NM_DedicatedServer && Cast<APlayerController>(Exiting)
+		&& State && (RoomSession.HasRoom() || bEncounterStarted || State->IsCountdownActive()))
+	{
+		for (FConstPlayerControllerIterator It = GetWorld()->GetPlayerControllerIterator(); It; ++It)
+		{
+			if (IsValid(It->Get()) && It->Get() != Exiting)
+			{
+				return;
+			}
+		}
+		// Commit the empty-session reset now; a same-frame arrival must not cancel it.
+		// Wait one tick so the departing controller is fully removed before travel.
+		GetWorldTimerManager().SetTimerForNextTick(this, &ADediServerRPGGameMode::ResetEmptyDedicatedServer);
+	}
+}
+
+void ADediServerRPGGameMode::ResetEmptyDedicatedServer()
+{
+	UWorld* World = GetWorld();
+	const ADSTRGameState* State = GetGameState<ADSTRGameState>();
+	if (!World || GetNetMode() != NM_DedicatedServer
+		|| !State || (!RoomSession.HasRoom() && !bEncounterStarted && !State->IsCountdownActive()))
+	{
+		return;
+	}
+
+	// Recreate the map, enemies, gate and game state together for the next party.
+	UE_LOG(LogDSTR, Log, TEXT("DSTR_SERVER_EMPTY_RESET Map=%s"), *World->URL.Map);
+	if (!World->ServerTravel(World->URL.Map))
+	{
+		UE_LOG(LogDSTR, Error, TEXT("DSTR_SERVER_EMPTY_RESET_FAILED"));
+	}
 }
 
 bool ADediServerRPGGameMode::ShouldAutoStart(const FString& CommandLine)
@@ -241,6 +355,10 @@ void ADediServerRPGGameMode::BeginStartCountdown()
 void ADediServerRPGGameMode::BeginPlay()
 {
 	Super::BeginPlay();
+	if (GetNetMode() == NM_DedicatedServer)
+	{
+		UE_LOG(LogDSTR, Log, TEXT("DSTR_SERVER_READY Mode=Dedicated Players=%d"), GetNumPlayers());
+	}
 
 #if !UE_BUILD_SHIPPING
 	const float Dilation = GetCaptureTimeDilation(FCommandLine::Get());
@@ -307,6 +425,69 @@ void ADediServerRPGGameMode::RunNavProbe()
 				*Config.Name.ToString(), Config.AgentRadius, Config.AgentHeight, Config.AgentStepHeight);
 		}
 	}
+	// 지오메트리를 넓혔는데 내비 볼륨이 안 따라오면 새 구역은 영원히 구워지지 않는다.
+	for (const ANavigationData* NavData : Navigation ? Navigation->NavDataSet : TArray<TObjectPtr<ANavigationData>>())
+	{
+		if (!NavData)
+		{
+			continue;
+		}
+		const FBox MeshBounds = NavData->GetBounds();
+		UE_LOG(LogDSTR, Log, TEXT("DSTR_NAV_PROBE_MESH Name=%s Runtime=%d Min=%s Max=%s"),
+			*NavData->GetName(),
+			static_cast<int32>(NavData->GetRuntimeGenerationMode()),
+			*MeshBounds.Min.ToCompactString(), *MeshBounds.Max.ToCompactString());
+		for (const FBox& Volume : NavData->GetNavigableBounds())
+		{
+			UE_LOG(LogDSTR, Log, TEXT("DSTR_NAV_PROBE_VOLUME Min=%s Max=%s"),
+				*Volume.Min.ToCompactString(), *Volume.Max.ToCompactString());
+		}
+	}
+	// 원점이 내비 밖이면 구멍이 얼마나 큰지 알아야 원인 규모를 가늠할 수 있다.
+	FNavLocation WideOrigin;
+	const ANavigationData* WideNavData = nullptr;
+	const bool bWideFound = Navigation && Navigation->ProjectPointToNavigation(
+		EncounterOrigin, WideOrigin, FVector(4000.0f), WideNavData);
+	UE_LOG(LogDSTR, Log, TEXT("DSTR_NAV_PROBE_ORIGIN_WIDE Found=%d At=%s Dist=%.0f"),
+		bWideFound ? 1 : 0,
+		*WideOrigin.Location.ToCompactString(),
+		bWideFound ? FVector::Dist(EncounterOrigin, WideOrigin.Location) : -1.0f);
+	// 원점 아래에 뭐가 있고, 그 위 여유가 에이전트 높이를 넘는지 봐야 구멍의 정체를 안다.
+	FHitResult FloorHit;
+	FCollisionQueryParams FloorParams(SCENE_QUERY_STAT(DSTRNavProbeFloor), true);
+	if (GetWorld()->LineTraceSingleByChannel(FloorHit,
+		EncounterOrigin + FVector(0.0f, 0.0f, 200.0f),
+		EncounterOrigin - FVector(0.0f, 0.0f, 1000.0f), ECC_WorldStatic, FloorParams))
+	{
+		const UPrimitiveComponent* FloorComponent = FloorHit.GetComponent();
+		UE_LOG(LogDSTR, Log,
+			TEXT("DSTR_NAV_PROBE_FLOOR Actor=%s Comp=%s At=%s AffectsNav=%d Collision=%d"),
+			*GetNameSafe(FloorHit.GetActor()), *GetNameSafe(FloorComponent),
+			*FloorHit.ImpactPoint.ToCompactString(),
+			FloorComponent && FloorComponent->CanEverAffectNavigation() ? 1 : 0,
+			FloorComponent ? static_cast<int32>(FloorComponent->GetCollisionEnabled()) : -1);
+
+		FHitResult CeilingHit;
+		if (GetWorld()->LineTraceSingleByChannel(CeilingHit,
+			FloorHit.ImpactPoint + FVector(0.0f, 0.0f, 5.0f),
+			FloorHit.ImpactPoint + FVector(0.0f, 0.0f, 2000.0f), ECC_WorldStatic, FloorParams))
+		{
+			UE_LOG(LogDSTR, Log,
+				TEXT("DSTR_NAV_PROBE_CEILING Actor=%s Comp=%s At=%s Clearance=%.0f Agent=144"),
+				*GetNameSafe(CeilingHit.GetActor()), *GetNameSafe(CeilingHit.GetComponent()),
+				*CeilingHit.ImpactPoint.ToCompactString(),
+				CeilingHit.ImpactPoint.Z - FloorHit.ImpactPoint.Z);
+		}
+		else
+		{
+			UE_LOG(LogDSTR, Log, TEXT("DSTR_NAV_PROBE_CEILING None Clearance=inf"));
+		}
+	}
+	else
+	{
+		UE_LOG(LogDSTR, Warning, TEXT("DSTR_NAV_PROBE_FLOOR None Origin=%s"),
+			*EncounterOrigin.ToCompactString());
+	}
 	DoorSpawnPoints = CollectDoorSpawnPoints();
 	ResolveBossRoom();
 	UE_LOG(LogDSTR, Log, TEXT("DSTR_NAV_PROBE_DONE Origin=%s Usable=%d Attempts=%d Room=%s"),
@@ -364,8 +545,38 @@ void ADediServerRPGGameMode::StartEncounter()
 	}
 #endif
 
+	const FVector PendingOrigin = GetEncounterOrigin();
+	int32 NavDataCount = 0;
+	bool bNavBuilding = false;
+	bool bOriginOnNav = false;
+	const bool bNavReady = IsEncounterNavigationReady(
+		GetWorld(), PendingOrigin, NavDataCount, bNavBuilding, bOriginOnNav);
+	if (!bNavReady && EncounterNavWaitSeconds < EncounterNavMaxWaitSeconds)
+	{
+		EncounterNavWaitSeconds += EncounterNavRetrySeconds;
+		GetWorldTimerManager().SetTimer(
+			EncounterStartTimer,
+			this,
+			&ADediServerRPGGameMode::StartEncounter,
+			EncounterNavRetrySeconds,
+			false);
+		return;
+	}
+	if (bNavReady)
+	{
+		UE_LOG(LogDSTR, Log, TEXT("DSTR_ENCOUNTER_NAV Ready=1 Waited=%.1f NavData=%d Building=%d OriginOnNav=%d Origin=%s"),
+			EncounterNavWaitSeconds, NavDataCount, bNavBuilding ? 1 : 0, bOriginOnNav ? 1 : 0,
+			*PendingOrigin.ToCompactString());
+	}
+	else
+	{
+		UE_LOG(LogDSTR, Warning, TEXT("DSTR_ENCOUNTER_NAV Ready=0 Waited=%.1f NavData=%d Building=%d OriginOnNav=%d Origin=%s"),
+			EncounterNavWaitSeconds, NavDataCount, bNavBuilding ? 1 : 0, bOriginOnNav ? 1 : 0,
+			*PendingOrigin.ToCompactString());
+	}
+
 	bEncounterStarted = true;
-	EncounterOrigin = GetEncounterOrigin();
+	EncounterOrigin = PendingOrigin;
 	DoorSpawnPoints = CollectDoorSpawnPoints();
 	if (ADSTRGameState* State = GetGameState<ADSTRGameState>())
 	{
@@ -478,24 +689,41 @@ TArray<FVector> ADediServerRPGGameMode::CollectFloorTileCentres(TArray<FVector>&
 	return Centres;
 }
 
-bool ADediServerRPGGameMode::ResolveBossRoom()
+// 손으로 지은 맵에서는 런타임 추론보다 레벨에 찍어둔 마커가 항상 옳다.
+bool ADediServerRPGGameMode::ResolveBossRoomFromMarker(UWorld* World, UNavigationSystemV1* Navigation)
 {
-	BossRoomLocation = FVector::ZeroVector;
-	AdvancePath.Reset();
-	UWorld* World = GetWorld();
-	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
-	ADSTRGameState* State = GetGameState<ADSTRGameState>();
-	if (!World || !Navigation)
+	const ADSTRBossRoomMarker* Marker = ADSTRBossRoomMarker::FindInWorld(World);
+	if (!Marker)
 	{
 		return false;
 	}
 
+	ArenaRadius = Marker->GetArenaRadius();
+	ArenaHalfHeight = Marker->GetArenaHalfHeight();
+
+	FNavLocation Projected;
+	const ANavigationData* AnyNavData = nullptr;
+	const bool bOnNav = Navigation->ProjectPointToNavigation(
+		Marker->GetActorLocation(), Projected, FVector(DoorNavProjectionExtent), AnyNavData);
+	BossRoomLocation = bOnNav ? Projected.Location : Marker->GetActorLocation();
+	if (!bOnNav)
+	{
+		UE_LOG(LogDSTR, Warning, TEXT("DSTR_BOSS_ROOM_MARKER_OFFNAV Name=%s At=%s Extent=%.0f"),
+			*Marker->GetName(), *Marker->GetActorLocation().ToCompactString(), DoorNavProjectionExtent);
+	}
+	UE_LOG(LogDSTR, Log, TEXT("DSTR_BOSS_ROOM_MARKER Name=%s At=%s OnNav=%d Radius=%.0f HalfHeight=%.0f"),
+		*Marker->GetName(), *BossRoomLocation.ToCompactString(),
+		bOnNav ? 1 : 0, ArenaRadius, ArenaHalfHeight);
+	return true;
+}
+
+bool ADediServerRPGGameMode::ResolveBossRoomByScan(UWorld* World, UNavigationSystemV1* Navigation)
+{
 	TArray<FVector> Tiles;
 	TArray<FVector> Points = CollectFloorTileCentres(Tiles);
 	Points.Append(DoorSpawnPoints);
 
 	TArray<FDSTRBossRoomCandidate> Candidates;
-	TArray<FVector> CandidatePoints;
 	Candidates.Reserve(Points.Num());
 	for (const FVector& Point : Points)
 	{
@@ -522,7 +750,6 @@ bool ADediServerRPGGameMode::ResolveBossRoom()
 				&& FMath::Abs(Tile.Z - Projected.Location.Z) <= FDSTRDungeonRules::BossRoomRadius * 0.3f ? 1 : 0;
 		}
 		Candidates.Add(Candidate);
-		CandidatePoints.Add(Projected.Location);
 	}
 
 	float LongestPath = 0.0f;
@@ -556,20 +783,48 @@ bool ADediServerRPGGameMode::ResolveBossRoom()
 			Candidates.Num(),
 			DoorSpawnPoints.Num());
 	}
+	return Pick != INDEX_NONE;
+}
+
+bool ADediServerRPGGameMode::ResolveBossRoom()
+{
+	BossRoomLocation = FVector::ZeroVector;
+	AdvancePath.Reset();
+	ArenaRadius = FDSTRDungeonRules::BossRoomRadius;
+	ArenaHalfHeight = FDSTRDungeonRules::BossRoomHalfHeight;
+	UWorld* World = GetWorld();
+	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(World);
+	ADSTRGameState* State = GetGameState<ADSTRGameState>();
+	if (!World || !Navigation)
+	{
+		return false;
+	}
+
+	const bool bResolved = ResolveBossRoomFromMarker(World, Navigation)
+		|| ResolveBossRoomByScan(World, Navigation);
 
 	const UNavigationPath* BestPath = UNavigationSystemV1::FindPathToLocationSynchronously(
 		World, EncounterOrigin, BossRoomLocation);
-	AdvancePath = BestPath && BestPath->IsValid()
+	const bool bPathUsable = BestPath && BestPath->IsValid() && !BestPath->IsPartial();
+	AdvancePath = bPathUsable
 		? FDSTRDungeonRules::SimplifyPath(BestPath->PathPoints)
 		: TArray<FVector>({EncounterOrigin, BossRoomLocation});
 	if (State)
 	{
-		State->SetBossRoom(BossRoomLocation);
+		State->SetBossRoom(BossRoomLocation, ArenaRadius, ArenaHalfHeight);
 		State->SetAdvancePath(AdvancePath);
+	}
+	if (!bPathUsable)
+	{
+		// 경로가 없으면 진격로·매복·관문이 전부 직선 폴백으로 깔려 벽을 관통한다.
+		UE_LOG(LogDSTR, Warning, TEXT("DSTR_ADVANCE_PATH_UNREACHABLE Room=%s Valid=%d Partial=%d"),
+			*BossRoomLocation.ToCompactString(),
+			BestPath && BestPath->IsValid() ? 1 : 0,
+			BestPath && BestPath->IsPartial() ? 1 : 0);
 	}
 	UE_LOG(LogDSTR, Log, TEXT("DSTR_ADVANCE_PATH Points=%d Raw=%d"),
 		AdvancePath.Num(), BestPath ? BestPath->PathPoints.Num() : 0);
-	return Pick != INDEX_NONE;
+	return bResolved;
 }
 
 bool ADediServerRPGGameMode::PlaceDormantBoss()
@@ -608,7 +863,7 @@ void ADediServerRPGGameMode::BeginAdvance()
 
 	UNavigationSystemV1* Navigation = FNavigationSystem::GetCurrent<UNavigationSystemV1>(GetWorld());
 	const FDSTRBossGatePlacement Placement = FDSTRDungeonRules::PlaceGate(
-		AdvancePath, BossRoomLocation, FDSTRDungeonRules::BossRoomRadius);
+		AdvancePath, BossRoomLocation, ArenaRadius);
 	const TArray<FVector> Corridor = Placement.bValid
 		? FDSTRDungeonRules::TrimPathAtGate(AdvancePath, Placement.Location, Placement.Forward)
 		: AdvancePath;
@@ -766,7 +1021,8 @@ void ADediServerRPGGameMode::CheckGateBypass()
 		}
 		const float Distance = static_cast<float>(
 			FVector::Dist2D(Character->GetActorLocation(), BossRoomLocation));
-		if (Distance > FDSTRDungeonRules::BossRoomRadius)
+		if (!FDSTRDungeonRules::IsInsideArena(
+			Character->GetActorLocation(), BossRoomLocation, ArenaRadius, ArenaHalfHeight))
 		{
 			continue;
 		}
@@ -819,8 +1075,8 @@ void ADediServerRPGGameMode::EnforceArenaLock(const float DeltaSeconds)
 		{
 			continue;
 		}
-		const bool bInside = FVector::Dist2D(Character->GetActorLocation(), BossRoomLocation)
-			<= FDSTRDungeonRules::BossRoomRadius;
+		const bool bInside = FDSTRDungeonRules::IsInsideArena(
+			Character->GetActorLocation(), BossRoomLocation, ArenaRadius, ArenaHalfHeight);
 		float& Outside = SecondsOutsideArena.FindOrAdd(Character);
 		Outside = bInside ? 0.0f : Outside + DeltaSeconds;
 		if (!FDSTRDungeonRules::ShouldPullToArena(true, bInside, Outside))
@@ -1112,10 +1368,21 @@ FDSTRMatchProgress ADediServerRPGGameMode::CaptureProgress() const
 	const ADSTREnemyCharacter* Boss = State->GetBoss();
 	const UDSTRAttributeSet* BossAttributes = Boss ? Boss->GetAttributeSet() : nullptr;
 	Progress.BossHealth = BossAttributes ? FMath::FloorToInt(BossAttributes->GetHealth()) : -1;
+	// 넓은 던전에서는 보스방으로 걸어가는 동안 나머지 지표가 전부 고정돼 멈춤으로 오탐된다.
+	float NearestToBossRoom = TNumericLimits<float>::Max();
 	for (const ADediServerRPGCharacter* Character : GetPlayerCharacters())
 	{
-		Progress.PlayersStanding += Character->IsDowned() ? 0 : 1;
+		if (Character->IsDowned())
+		{
+			continue;
+		}
+		++Progress.PlayersStanding;
+		NearestToBossRoom = FMath::Min(NearestToBossRoom, static_cast<float>(
+			FVector::Dist(Character->GetActorLocation(), BossRoomLocation)));
 	}
+	Progress.BossApproachStep = NearestToBossRoom < TNumericLimits<float>::Max()
+		? FMath::FloorToInt(NearestToBossRoom / FDSTRStallRules::BossApproachStepSize)
+		: 0;
 	return Progress;
 }
 

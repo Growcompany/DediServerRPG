@@ -31,17 +31,17 @@
 #include "Player/DSTRPlayerController.h"
 #include "Player/DSTRPlayerState.h"
 #include "UI/DSTRHUDViewModel.h"
+#include "UI/DSTRMinimapCapture.h"
 #include "UI/DSTRMinimapViewModel.h"
+#include "UI/DSTRUIStyle.h"
 #include "World/DSTRAttackBuffPickup.h"
 #include "World/DSTRBossGate.h"
 
+using namespace DSTRUIStyle;
+
 namespace
 {
-	const FLinearColor PanelColor(0.015f, 0.025f, 0.045f, 0.88f);
-	const FLinearColor AccentColor(0.05f, 0.75f, 1.0f, 1.0f);
-	const FLinearColor MutedColor(0.62f, 0.72f, 0.82f, 1.0f);
 	const FLinearColor ReadyColor(0.15f, 0.95f, 0.72f, 1.0f);
-	const FLinearColor DangerColor(1.0f, 0.18f, 0.14f, 1.0f);
 	const FLinearColor AllyMarkerColor(0.3f, 0.6f, 1.0f, 1.0f);
 	const FLinearColor EnemyMarkerColor(0.9f, 0.2f, 0.2f, 1.0f);
 	const FLinearColor BuffMarkerColor(1.0f, 0.85f, 0.2f, 1.0f);
@@ -199,7 +199,7 @@ void UDSTRCombatHUDWidget::BuildWidgetTree()
 	ResponsiveRoot->SetContent(DesignSurface);
 	WidgetTree->RootWidget = ResponsiveRoot;
 
-	UBorder* PhasePanel = MakePanel(PanelColor);
+	UBorder* PhasePanel = MakePanel(HUDPanelColor);
 	UVerticalBox* PhaseBox = WidgetTree->ConstructWidget<UVerticalBox>();
 	PhaseText = MakeText(TEXT("WAITING FOR PLAYERS"), 18, AccentColor);
 	PhaseText->SetJustification(ETextJustify::Center);
@@ -226,7 +226,7 @@ void UDSTRCombatHUDWidget::BuildWidgetTree()
 	NetworkPanel->SetContent(NetworkText);
 	AddPanelToCanvas(Root, NetworkPanel, FVector2D(1.0f, 0.0f), FVector2D(-20.0f, 20.0f), FVector2D(250.0f, 34.0f), FVector2D(1.0f, 0.0f));
 
-	UBorder* PartyPanel = MakePanel(PanelColor);
+	UBorder* PartyPanel = MakePanel(HUDPanelColor);
 	UVerticalBox* PartyBox = WidgetTree->ConstructWidget<UVerticalBox>();
 	PartyBox->AddChildToVerticalBox(MakeText(TEXT("CO-OP PARTY"), 14, AccentColor));
 	for (int32 Index = 0; Index < 4; ++Index)
@@ -251,7 +251,7 @@ void UDSTRCombatHUDWidget::BuildWidgetTree()
 	AddPanelToCanvas(Root, BossPanel, FVector2D(0.5f, 0.0f), FVector2D(0.0f, 88.0f), FVector2D(440.0f, 46.0f), FVector2D(0.5f, 0.0f));
 	BossPanel->SetVisibility(ESlateVisibility::Collapsed);
 
-	UBorder* StatsPanel = MakePanel(PanelColor);
+	UBorder* StatsPanel = MakePanel(HUDPanelColor);
 	UVerticalBox* StatsBox = WidgetTree->ConstructWidget<UVerticalBox>();
 	StatsBox->AddChildToVerticalBox(MakeText(TEXT("COMBAT STATUS"), 13, AccentColor));
 	HealthText = MakeText(TEXT("HP 100 / 100"), 12, FLinearColor::White);
@@ -267,11 +267,11 @@ void UDSTRCombatHUDWidget::BuildWidgetTree()
 	StatsPanel->SetContent(StatsBox);
 	AddPanelToCanvas(Root, StatsPanel, FVector2D(0.0f, 1.0f), FVector2D(20.0f, -20.0f), FVector2D(280.0f, 104.0f), FVector2D(0.0f, 1.0f));
 
-	UBorder* AbilityPanel = MakePanel(PanelColor);
+	UBorder* AbilityPanel = MakePanel(HUDPanelColor);
 	UHorizontalBox* AbilityBox = WidgetTree->ConstructWidget<UHorizontalBox>();
 	const TCHAR* Keys[] = {TEXT("LMB"), TEXT("RMB"), TEXT("Q"), TEXT("E"), TEXT("R")};
 	const TCHAR* Names[] = {
-		TEXT("BASIC"), TEXT("MAKE WAY"), TEXT("FORTIFY"), TEXT("ASSAULT"), TEXT("RECKON")};
+		TEXT("BASIC"), TEXT("SMASH"), TEXT("FORTIFY"), TEXT("ASSAULT"), TEXT("RECKON")};
 	for (int32 Index = 0; Index < AbilityCardCount; ++Index)
 	{
 		UBorder* Card = MakePanel(FLinearColor(0.025f, 0.06f, 0.09f, 0.95f));
@@ -300,7 +300,7 @@ void UDSTRCombatHUDWidget::BuildWidgetTree()
 	AbilityPanel->SetContent(AbilityBox);
 	AddPanelToCanvas(Root, AbilityPanel, FVector2D(0.5f, 1.0f), FVector2D(AbilityPanelOffsetX, -20.0f), FVector2D(AbilityPanelWidth, 92.0f), FVector2D(0.5f, 1.0f));
 
-	UBorder* HintPanel = MakePanel(PanelColor);
+	UBorder* HintPanel = MakePanel(HUDPanelColor);
 	HintPanel->SetPadding(FMargin(8.0f, 6.0f));
 	UVerticalBox* HintBox = WidgetTree->ConstructWidget<UVerticalBox>();
 	InteractHintText = MakeText(
@@ -415,13 +415,11 @@ void UDSTRCombatHUDWidget::BuildWidgetTree()
 	HeadMarker->SetVisibility(ESlateVisibility::Collapsed);
 }
 
-void UDSTRCombatHUDWidget::SetMinimapSource(
-	UTextureRenderTarget2D* InRenderTarget,
-	const FDSTRMinimapFrame& InFrame)
+void UDSTRCombatHUDWidget::SetMinimapSource(ADSTRMinimapCapture* InCapture)
 {
-	MinimapRenderTarget = InRenderTarget;
-	MinimapFrame = InFrame;
-	bMinimapBrushApplied = false;
+	MinimapCapture = InCapture;
+	MinimapFrame = InCapture ? InCapture->GetFrame() : FDSTRMinimapFrame();
+	ActiveMinimapLayer = INDEX_NONE;
 }
 
 void UDSTRCombatHUDWidget::PlaceMinimapMarker(
@@ -450,7 +448,15 @@ void UDSTRCombatHUDWidget::PlaceMinimapMarker(
 
 	UImage* Marker = MinimapMarkers[MarkerIndex];
 	Marker->SetBrush(Brush);
-	Marker->SetRenderOpacity(Opacity);
+	// 다른 층 마커: 프레임 안이면 흐리게, 밖이면 가장자리에 유령 점을 만들지 말고 숨긴다.
+	const bool bOtherLayer = MinimapCapture.IsValid()
+		&& !MinimapCapture->IsWithinLayer(ActiveMinimapLayer, static_cast<float>(World.Z));
+	if (bOtherLayer && bClamped)
+	{
+		return;
+	}
+	Marker->SetRenderOpacity(
+		bOtherLayer ? Opacity * FDSTRMinimapViewModel::OtherLayerOpacity : Opacity);
 	Marker->SetVisibility(ESlateVisibility::HitTestInvisible);
 	MinimapMarkerSlots[MarkerIndex]->SetSize(FVector2D(Size, Size));
 	MinimapMarkerSlots[MarkerIndex]->SetPosition(FVector2D(
@@ -464,7 +470,8 @@ void UDSTRCombatHUDWidget::RefreshMinimap(const ADSTRGameState* State, APlayerCo
 {
 	UWorld* World = GetWorld();
 	const EDSTRMatchPhase Phase = State ? State->GetMatchPhase() : EDSTRMatchPhase::WaitingForPlayers;
-	const bool bShow = MinimapPanel && MinimapRenderTarget && World && PC
+	const bool bShow = MinimapPanel && MinimapCapture.IsValid()
+		&& MinimapCapture->GetLayerCount() > 0 && World && PC
 		&& Phase != EDSTRMatchPhase::WaitingForPlayers
 		&& Phase != EDSTRMatchPhase::Clear
 		&& Phase != EDSTRMatchPhase::Failed;
@@ -477,17 +484,23 @@ void UDSTRCombatHUDWidget::RefreshMinimap(const ADSTRGameState* State, APlayerCo
 		return;
 	}
 
-	if (!bMinimapBrushApplied && MinimapImage)
+	const APawn* LocalPawn = PC->GetPawn();
+	// 로컬 플레이어가 선 층만 그린다. 층이 바뀌면 그 층 렌더타깃으로 브러시를 교체한다.
+	const int32 DesiredLayer = LocalPawn
+		? MinimapCapture->FindLayerForZ(static_cast<float>(LocalPawn->GetActorLocation().Z))
+		: 0;
+	if (MinimapImage && DesiredLayer != INDEX_NONE && DesiredLayer != ActiveMinimapLayer)
 	{
 		FSlateBrush Brush;
-		Brush.SetResourceObject(MinimapRenderTarget);
+		Brush.SetResourceObject(MinimapCapture->GetLayerTarget(DesiredLayer));
 		Brush.ImageSize = FVector2D(FDSTRMinimapViewModel::PanelSize, FDSTRMinimapViewModel::PanelSize);
 		MinimapImage->SetBrush(Brush);
-		bMinimapBrushApplied = true;
+		// 층이 바뀌면 그 층의 프레임으로 좌표계를 갈아끼워야 마커가 어긋나지 않는다.
+		MinimapFrame = MinimapCapture->GetLayerFrame(DesiredLayer);
+		ActiveMinimapLayer = DesiredLayer;
 	}
 
 	int32 MarkerIndex = 0;
-	const APawn* LocalPawn = PC->GetPawn();
 	if (LocalPawn)
 	{
 		const float Heading = FDSTRMinimapViewModel::HeadingToArrowAngle(
@@ -982,7 +995,7 @@ void UDSTRCombatHUDWidget::RefreshHUD()
 	}
 
 	RefreshAbilityCard(0, ASC, DSTRGameplayTags::Effect_Cooldown_Attack.GetTag());
-	RefreshAbilityCard(1, ASC, DSTRGameplayTags::Effect_Cooldown_MakeWay.GetTag());
+	RefreshAbilityCard(1, ASC, DSTRGameplayTags::Effect_Cooldown_Smash.GetTag());
 	RefreshAbilityCard(2, ASC, DSTRGameplayTags::Effect_Cooldown_Fortify.GetTag());
 	RefreshAbilityCard(3, ASC, DSTRGameplayTags::Effect_Cooldown_Charge.GetTag());
 	RefreshAbilityCard(4, ASC, DSTRGameplayTags::Effect_Cooldown_Reckoning.GetTag());

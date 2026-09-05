@@ -15,19 +15,16 @@
 #include "Components/VerticalBoxSlot.h"
 #include "Game/DSTRGameState.h"
 #include "GameFramework/PlayerState.h"
+#include "Layout/Clipping.h"
 #include "Player/DSTRPlayerController.h"
 #include "Player/DSTRPlayerState.h"
 #include "Presentation/DSTRVisualAssetRegistry.h"
+#include "Styling/SlateTypes.h"
 #include "UI/DSTRHUDViewModel.h"
 #include "UI/DSTRLobbyViewModel.h"
+#include "UI/DSTRUIStyle.h"
 
-namespace
-{
-	const FLinearColor PanelColor(0.015f, 0.025f, 0.045f, 0.92f);
-	const FLinearColor AccentColor(0.05f, 0.75f, 1.0f, 1.0f);
-	const FLinearColor MutedColor(0.62f, 0.72f, 0.82f, 1.0f);
-	const FLinearColor ButtonColor(0.08f, 0.32f, 0.50f, 1.0f);
-}
+using namespace DSTRUIStyle;
 
 TSharedRef<SWidget> UDSTRLobbyWidget::RebuildWidget()
 {
@@ -84,14 +81,17 @@ void UDSTRLobbyWidget::BuildWidgetTree()
 	Panel->SetBrushColor(PanelColor);
 	Panel->SetPadding(FMargin(20.0f, 16.0f));
 	UVerticalBox* Box = WidgetTree->ConstructWidget<UVerticalBox>();
-	UTextBlock* Title = MakeText(TEXT("LOBBY"), 22, AccentColor);
-	Title->SetJustification(ETextJustify::Center);
-	Box->AddChildToVerticalBox(Title);
-	HintText = MakeText(TEXT("HOST STARTS THE DUNGEON"), 12, MutedColor);
+	TitleText = MakeText(TEXT("LOBBY"), 22, AccentColor);
+	TitleText->SetJustification(ETextJustify::Left);
+	TitleText->SetAutoWrapText(false);
+	TitleText->SetTextOverflowPolicy(ETextOverflowPolicy::Ellipsis);
+	TitleText->SetClipping(EWidgetClipping::ClipToBounds);
+	Box->AddChildToVerticalBox(TitleText);
+	HintText = MakeText(TEXT("LEADER STARTS THE DUNGEON"), 12, MutedColor);
 	HintText->SetJustification(ETextJustify::Center);
 	Box->AddChildToVerticalBox(HintText)->SetPadding(FMargin(0.0f, 4.0f, 0.0f, 2.0f));
 	UTextBlock* SkillKeysText = MakeText(
-		TEXT("LMB ATTACK  RMB MAKE WAY  Q FORTIFY  E ASSAULT  R RECKONING"), 10, MutedColor);
+		TEXT("LMB ATTACK  RMB SMASH  Q FORTIFY  E ASSAULT  R RECKONING"), 10, MutedColor);
 	SkillKeysText->SetJustification(ETextJustify::Center);
 	Box->AddChildToVerticalBox(SkillKeysText);
 	UTextBlock* VerbKeysText = MakeText(TEXT("SPACE JUMP  F INTERACT"), 10, MutedColor);
@@ -158,6 +158,10 @@ void UDSTRLobbyWidget::NativeTick(const FGeometry& MyGeometry, const float InDel
 
 	const APlayerState* LocalState = GetOwningPlayerState();
 	const bool bIsHost = State->IsHost(LocalState);
+	const FText RoomTitle = State->GetRoomName().IsEmpty()
+		? FText::FromString(TEXT("LOBBY")) : FText::FromString(State->GetRoomName());
+	TitleText->SetText(RoomTitle);
+	TitleText->SetToolTipText(RoomTitle);
 	for (int32 Index = 0; Index < SlotTexts.Num(); ++Index)
 	{
 		const APlayerState* Member = State->PlayerArray.IsValidIndex(Index) ? State->PlayerArray[Index].Get() : nullptr;
@@ -176,7 +180,7 @@ void UDSTRLobbyWidget::NativeTick(const FGeometry& MyGeometry, const float InDel
 		: (!bAssetsLoaded ? TEXT("LOADING ASSETS...")
 			: (bIsHost
 				? (bAllReady ? TEXT("PRESS START WHEN EVERYONE IS IN") : TEXT("WAITING FOR PLAYERS TO LOAD"))
-				: TEXT("HOST STARTS THE DUNGEON")))));
+				: TEXT("LEADER STARTS THE DUNGEON")))));
 	HintText->SetColorAndOpacity(FSlateColor(bCountingDown ? AccentColor : MutedColor));
 	StartButton->SetVisibility(
 		!bCountingDown && FDSTRLobbyViewModel::CanHostStart(bIsHost, State->GetMatchPhase(), State->PlayerArray.Num(), bAssetsLoaded && bAllReady)

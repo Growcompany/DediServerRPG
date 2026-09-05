@@ -117,23 +117,30 @@ TArray<FVector> FDSTRDungeonRules::PlaceAmbushes(const TArray<FVector>& Path, co
 
 int32 FDSTRDungeonRules::NextWaypointIndex(const TArray<FVector>& Path, const FVector& From)
 {
-	if (Path.IsEmpty())
+	if (Path.Num() < 2)
 	{
 		return INDEX_NONE;
 	}
 
-	int32 Nearest = 0;
+	int32 Next = 1;
 	double NearestSquared = TNumericLimits<double>::Max();
-	for (int32 Index = 0; Index < Path.Num(); ++Index)
+	// 가장 가까운 꼭짓점이 아직 앞에 있을 수 있으므로, 현재 구간의 끝을 향한다.
+	for (int32 Index = 1; Index < Path.Num(); ++Index)
 	{
-		const double DistanceSquared = FVector::DistSquared2D(Path[Index], From);
-		if (DistanceSquared < NearestSquared)
+		const FVector2D OnSegment = FMath::ClosestPointOnSegment2D(
+			FVector2D(From), FVector2D(Path[Index - 1]), FVector2D(Path[Index]));
+		const double DistanceSquared = FVector2D::DistSquared(OnSegment, FVector2D(From));
+		if (DistanceSquared <= NearestSquared)
 		{
 			NearestSquared = DistanceSquared;
-			Nearest = Index;
+			Next = Index;
 		}
 	}
-	const int32 Next = Nearest + 1;
+	while (Path.IsValidIndex(Next)
+		&& FVector::DistSquared2D(Path[Next], From) <= FMath::Square(AdvanceWaypointRadius))
+	{
+		++Next;
+	}
 	return Path.IsValidIndex(Next) ? Next : INDEX_NONE;
 }
 
@@ -255,6 +262,17 @@ TArray<FVector> FDSTRDungeonRules::TrimPathAtGate(
 FVector FDSTRDungeonRules::GetGateEntryPoint(const FVector& GateLocation, const FVector& GateForward)
 {
 	return GateLocation + GateForward.GetSafeNormal2D() * GateEntryDepth;
+}
+
+// 보스방이 지하면 2D 거리만으로는 바로 위층을 아레나 안으로 오인한다.
+bool FDSTRDungeonRules::IsInsideArena(
+	const FVector& Point,
+	const FVector& Room,
+	const float Radius,
+	const float HalfHeight)
+{
+	return FVector::Dist2D(Point, Room) <= Radius
+		&& FMath::Abs(Point.Z - Room.Z) <= HalfHeight;
 }
 
 bool FDSTRDungeonRules::ShouldPullToArena(

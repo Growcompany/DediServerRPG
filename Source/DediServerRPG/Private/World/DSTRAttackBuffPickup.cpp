@@ -9,7 +9,8 @@
 #include "AbilitySystem/DSTRGameplayEffects.h"
 #include "Combat/DSTRCombatLibrary.h"
 #include "Components/SphereComponent.h"
-#include "Components/StaticMeshComponent.h"
+#include "Particles/ParticleSystem.h"
+#include "Particles/ParticleSystemComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
 #include "Engine/StaticMesh.h"
 #include "Net/UnrealNetwork.h"
@@ -27,10 +28,11 @@ ADSTRAttackBuffPickup::ADSTRAttackBuffPickup()
 	InteractionSphere->SetCollisionResponseToAllChannels(ECR_Ignore);
 	InteractionSphere->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
 
-	PickupMesh = CreateDefaultSubobject<UStaticMeshComponent>(TEXT("PickupMesh"));
-	PickupMesh->SetupAttachment(InteractionSphere);
-	PickupMesh->SetCollisionEnabled(ECollisionEnabled::NoCollision);
-	PickupMesh->SetRelativeScale3D(FVector(0.45f));
+	PickupOrb = CreateDefaultSubobject<UParticleSystemComponent>(TEXT("PickupOrb"));
+	PickupOrb->SetupAttachment(InteractionSphere);
+	PickupOrb->SetRelativeLocation(FVector(0.0f, 0.0f, 40.0f));
+	PickupOrb->SetRelativeScale3D(FVector(0.6f));
+	PickupOrb->SetAutoActivate(true);
 }
 
 void ADSTRAttackBuffPickup::BeginPlay()
@@ -46,18 +48,18 @@ void ADSTRAttackBuffPickup::BeginPlay()
 	{
 		if (ADSTRAttackBuffPickup* Pickup = WeakThis.Get())
 		{
-			Pickup->ApplyPickupMesh();
+			Pickup->ApplyPickupOrb();
 		}
 	});
 }
 
-void ADSTRAttackBuffPickup::ApplyPickupMesh()
+void ADSTRAttackBuffPickup::ApplyPickupOrb()
 {
-	UStaticMesh* Mesh = Cast<UStaticMesh>(
-		FDSTRVisualAssetRegistry::GetAttackBuffPickupMesh().ResolveObject());
-	if (PickupMesh && Mesh)
+	UParticleSystem* Orb = Cast<UParticleSystem>(
+		FDSTRVisualAssetRegistry::GetAttackBuffOrbEffect().ResolveObject());
+	if (PickupOrb && Orb)
 	{
-		PickupMesh->SetStaticMesh(Mesh);
+		PickupOrb->SetTemplate(Orb);
 	}
 }
 

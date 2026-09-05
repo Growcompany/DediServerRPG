@@ -28,10 +28,10 @@ FString FDSTRHUDViewModel::FormatNetworkRole(
 	{
 	case NM_Client:
 		return FString::Printf(
-			TEXT("DEDICATED SERVER  /  CLIENT %d/4"),
+			TEXT("CO-OP  /  CLIENT %d/4"),
 			FMath::Clamp(PlayerCount, 1, 4));
 	case NM_ListenServer:
-		return TEXT("LISTEN SERVER TEST");
+		return FString::Printf(TEXT("CO-OP  /  HOST %d/4"), FMath::Clamp(PlayerCount, 1, 4));
 	case NM_DedicatedServer:
 		return TEXT("DEDICATED SERVER");
 	default:
@@ -76,7 +76,7 @@ FString FDSTRHUDViewModel::FormatPhase(
 	switch (Phase)
 	{
 	case EDSTRMatchPhase::WaitingForPlayers:
-		return bCountdownActive ? FormatCountdown(CountdownRemaining) : TEXT("LOBBY - WAITING FOR HOST");
+		return bCountdownActive ? FormatCountdown(CountdownRemaining) : TEXT("LOBBY - WAITING FOR LEADER");
 	case EDSTRMatchPhase::Wave: return TEXT("WAVE 1 - CLEAR THE ENEMIES");
 	case EDSTRMatchPhase::Advance: return TEXT("ADVANCE - REACH THE BOSS CHAMBER");
 	case EDSTRMatchPhase::Boss: return TEXT("BOSS - COOPERATE AND SURVIVE");

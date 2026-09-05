@@ -1,4 +1,5 @@
 #include "Presentation/DSTRCombatGameplayCues.h"
+#include "Game/DSTRDungeonRules.h"
 #include "DSTRLog.h"
 
 #include "Enemy/DSTREnemyCharacter.h"
@@ -209,5 +210,9 @@ const FSoftObjectPath* ADSTRGateSealedGameplayCue::GetEffectPath() const
 
 FVector ADSTRGateSealedGameplayCue::GetEffectScale(const float Radius) const
 {
-	return GateCurtainScale;
+	// 기준 반폭(300)에서 잡은 스케일을 맞춤 폭에 비례시켜 넓은 게이트도 커튼이 다 덮는다.
+	const float WidthScale = Radius > FDSTRDungeonRules::GateFitMinHalfWidth
+		? GateCurtainScale.X * Radius / FDSTRDungeonRules::GateFitMinHalfWidth
+		: GateCurtainScale.X;
+	return FVector(WidthScale, WidthScale, GateCurtainScale.Z);
 }

@@ -19,6 +19,7 @@ struct FDSTRBossGatePlacement
 struct DEDISERVERRPG_API FDSTRDungeonRules
 {
 	static constexpr float BossRoomRadius = 700.0f;
+	static constexpr float BossRoomHalfHeight = 400.0f;
 	static constexpr int32 BossRoomMinTiles = 4;
 	static constexpr float BossRoomMinPathLength = 1500.0f;
 	static constexpr float BossRoomMaxPathLength = 4000.0f;
@@ -68,6 +69,8 @@ struct DEDISERVERRPG_API FDSTRDungeonRules
 	static TArray<FVector> TrimPathAtGate(
 		const TArray<FVector>& Path, const FVector& GateLocation, const FVector& GateForward);
 	static FVector GetGateEntryPoint(const FVector& GateLocation, const FVector& GateForward);
+	static bool IsInsideArena(
+		const FVector& Point, const FVector& Room, float Radius, float HalfHeight);
 	static bool ShouldPullToArena(bool bLocked, bool bInsideRoom, float SecondsOutside);
 
 	static float StepCameraArmLength(float Current, bool bNearAwakeBoss, float DeltaSeconds);

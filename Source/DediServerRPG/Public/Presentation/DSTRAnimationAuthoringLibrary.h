@@ -18,6 +18,12 @@ public:
 	UFUNCTION(BlueprintCallable, Category = "DSTR|Authoring")
 	static UAnimMontage* CreateCombatMontage(UAnimSequence* Source, FName SlotName, const FString& PackagePath, const FString& AssetName, float ImpactTimeSeconds, bool bHoldLastFrame = false, float MaxLengthSeconds = -1.0f);
 
+	// 실존 애니메이션 여러 개를 이어붙여 하나의 몽타주로 만든다(세그먼트별 최대 길이, -1=전체).
+	UFUNCTION(BlueprintCallable, Category = "DSTR|Authoring")
+	static UAnimMontage* CreateCompositeMontage(
+		const TArray<UAnimSequence*>& Sources, const TArray<float>& MaxSeconds, FName SlotName,
+		const FString& PackagePath, const FString& AssetName, float ImpactTimeSeconds = -1.0f);
+
 	UFUNCTION(BlueprintCallable, Category = "DSTR|Authoring")
 	static FString DescribeAnimation(UAnimationAsset* Asset);
 

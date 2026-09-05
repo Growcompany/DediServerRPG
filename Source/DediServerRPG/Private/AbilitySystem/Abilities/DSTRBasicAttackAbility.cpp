@@ -8,6 +8,7 @@
 #include "Combat/DSTRCombatantInterface.h"
 #include "Combat/DSTRCombatLibrary.h"
 #include "Combat/DSTRCombatMath.h"
+#include "Combat/DSTRHitDebug.h"
 #include "Combat/DSTRHitQuery.h"
 #include "Components/CapsuleComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
@@ -97,6 +98,16 @@ void UDSTRBasicAttackAbility::ExecuteImpact()
 		const float ConeHalfAngle = FDSTRCombatPresentation::GetHitConeHalfAngle(EDSTRCombatAction::BasicAttack);
 		ADSTREnemyCharacter* Best = nullptr;
 		float BestDistance = TNumericLimits<float>::Max();
+		// 꺼져 있으면 null → 아래 기록 호출 전부 비활성
+		UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::IsEnabled()
+			? UDSTRHitDebugSubsystem::Get(World) : nullptr;
+		if (HitDebug)
+		{
+			HitDebug->Begin(
+				Avatar, Origin,
+				FDSTRCombatPresentation::GetProfile(EDSTRCombatAction::BasicAttack).HitReach,
+				ConeHalfAngle, TEXT("Basic"));
+		}
 		TArray<ADSTREnemyCharacter*> Candidates;
 		FDSTRHitQuery::GatherEnemies(
 			Avatar, Origin,
@@ -107,6 +118,17 @@ void UDSTRBasicAttackAbility::ExecuteImpact()
 			const FVector ToTarget = Enemy->GetActorLocation() - Origin;
 			const float HitDistance = FDSTRCombatPresentation::GetHitDistance(
 				EDSTRCombatAction::BasicAttack, Enemy->GetCapsuleComponent()->GetScaledCapsuleRadius());
+			if (HitDebug)
+			{
+				const bool bInReach = ToTarget.SizeSquared()
+					<= FMath::Square(FMath::Max(HitDistance, 0.0f));
+				const bool bInCone = ConeHalfAngle <= 0.0f
+					|| FDSTRCombatMath::IsInFrontCone(Forward, ToTarget, ConeHalfAngle);
+				HitDebug->SetVerdict(Avatar, Enemy,
+					!bInCone ? EDSTRHitVerdict::OutOfCone
+					: !bInReach ? EDSTRHitVerdict::OutOfReach
+					: EDSTRHitVerdict::NotSelected);
+			}
 			if (FDSTRCombatMath::IsHit(Forward, ToTarget, HitDistance, ConeHalfAngle)
 				&& ToTarget.Size() < BestDistance)
 			{
@@ -116,6 +138,10 @@ void UDSTRBasicAttackAbility::ExecuteImpact()
 		}
 		if (Best)
 		{
+			if (HitDebug)
+			{
+				HitDebug->SetVerdict(Avatar, Best, EDSTRHitVerdict::Hit);
+			}
 			const FVector ToTarget = Best->GetActorLocation() - Origin;
 			UE_LOG(LogDSTR, Log, TEXT("DSTR_HIT Source=%s Target=%s Dist=%.0f Reach=%.0f Angle=%.0f Skill=Basic"),
 				*Avatar->GetName(), *Best->GetName(), ToTarget.Size(),
@@ -137,6 +163,10 @@ void UDSTRBasicAttackAbility::ExecuteImpact()
 				Best->PlayAbilityFeedback(
 					Best->GetActorLocation(), 160.0f, EDSTRCombatFeedback::HitDealt, Avatar);
 			}
+		}
+		if (HitDebug)
+		{
+			HitDebug->Commit(Avatar);
 		}
 	}
 

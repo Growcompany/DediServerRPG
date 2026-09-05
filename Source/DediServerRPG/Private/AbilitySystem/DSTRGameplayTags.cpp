@@ -3,10 +3,11 @@
 namespace DSTRGameplayTags
 {
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Attack_Basic, "Ability.Attack.Basic");
-	UE_DEFINE_GAMEPLAY_TAG(Ability_Skill_MakeWay, "Ability.Skill.MakeWay");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Skill_Fortify, "Ability.Skill.Fortify");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Skill_Charge, "Ability.Skill.Charge");
+	UE_DEFINE_GAMEPLAY_TAG(Ability_Skill_Smash, "Ability.Skill.Smash");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Skill_Reckoning, "Ability.Skill.Reckoning");
+	UE_DEFINE_GAMEPLAY_TAG(Ability_Skill_Sprint, "Ability.Skill.Sprint");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Interaction_Revive, "Ability.Interaction.Revive");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Reaction_Pulled, "Ability.Reaction.Pulled");
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Boss_ColossalBlow, "Ability.Boss.ColossalBlow");
@@ -15,9 +16,10 @@ namespace DSTRGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Ability_Boss_Subjugate, "Ability.Boss.Subjugate");
 
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_BasicAttack, "InputTag.Ability.BasicAttack");
-	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_MakeWay, "InputTag.Ability.MakeWay");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_Fortify, "InputTag.Ability.Fortify");
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_Sprint, "InputTag.Ability.Sprint");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_Charge, "InputTag.Ability.Charge");
+	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_Smash, "InputTag.Ability.Smash");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_Reckoning, "InputTag.Ability.Reckoning");
 	UE_DEFINE_GAMEPLAY_TAG(InputTag_Ability_Revive, "InputTag.Ability.Revive");
 
@@ -27,6 +29,7 @@ namespace DSTRGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(State_Attacking, "State.Attacking");
 	UE_DEFINE_GAMEPLAY_TAG(State_Fortified, "State.Fortified");
 	UE_DEFINE_GAMEPLAY_TAG(State_Slowed, "State.Slowed");
+	UE_DEFINE_GAMEPLAY_TAG(State_Sprinting, "State.Sprinting");
 
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Damage, "Effect.Damage");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Duration, "Effect.Duration");
@@ -35,9 +38,9 @@ namespace DSTRGameplayTags
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Heal, "Effect.Heal");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Buff_Attack, "Effect.Buff.Attack");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_Attack, "Effect.Cooldown.Attack");
-	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_MakeWay, "Effect.Cooldown.MakeWay");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_Fortify, "Effect.Cooldown.Fortify");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_Charge, "Effect.Cooldown.Charge");
+	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_Smash, "Effect.Cooldown.Smash");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_Reckoning, "Effect.Cooldown.Reckoning");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_EnemyAttack, "Effect.Cooldown.EnemyAttack");
 	UE_DEFINE_GAMEPLAY_TAG(Effect_Cooldown_BossColossal, "Effect.Cooldown.BossColossal");

@@ -6,6 +6,8 @@
 #include "AI/NavigationSystemBase.h"
 #include "Components/BoxComponent.h"
 #include "Components/PointLightComponent.h"
+#include "Components/StaticMeshComponent.h"
+#include "Engine/StaticMesh.h"
 #include "Game/DSTRDungeonRules.h"
 #include "GameFramework/Pawn.h"
 #include "GameplayCueManager.h"
@@ -55,6 +57,15 @@ ADSTRBossGate::ADSTRBossGate()
 	EntryTrigger->SetGenerateOverlapEvents(true);
 	EntryTrigger->SetCanEverAffectNavigation(false);
 
+	JoinTrigger = CreateDefaultSubobject<UBoxComponent>(TEXT("JoinTrigger"));
+	JoinTrigger->SetupAttachment(GateRoot);
+	JoinTrigger->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+	JoinTrigger->SetCollisionObjectType(ECC_WorldStatic);
+	JoinTrigger->SetCollisionResponseToAllChannels(ECR_Ignore);
+	JoinTrigger->SetCollisionResponseToChannel(ECC_Pawn, ECR_Overlap);
+	JoinTrigger->SetGenerateOverlapEvents(true);
+	JoinTrigger->SetCanEverAffectNavigation(false);
+
 	GateLight = CreateDefaultSubobject<UPointLightComponent>(TEXT("GateLight"));
 	GateLight->SetupAttachment(Barrier);
 	GateLight->SetIntensityUnits(ELightUnits::Candelas);
@@ -76,6 +87,7 @@ void ADSTRBossGate::BeginPlay()
 	{
 		FitToCorridor();
 		EntryTrigger->OnComponentBeginOverlap.AddDynamic(this, &ADSTRBossGate::HandleEntryOverlap);
+		JoinTrigger->OnComponentBeginOverlap.AddDynamic(this, &ADSTRBossGate::HandleJoinOverlap);
 	}
 	ApplyBarrierSize();
 	ApplyCollision();
@@ -131,11 +143,28 @@ void ADSTRBossGate::ApplyBarrierSize()
 		(FDSTRDungeonRules::GateThickness + FDSTRDungeonRules::GateEntryTriggerThickness) * 0.5f,
 		0.0f,
 		FDSTRDungeonRules::GateEntryTriggerHeight * 0.5f));
+
+	JoinTrigger->SetBoxExtent(FVector(
+		FDSTRDungeonRules::GateEntryTriggerThickness * 0.5f,
+		BarrierHalfWidth,
+		FDSTRDungeonRules::GateEntryTriggerHeight * 0.5f));
+	JoinTrigger->SetRelativeLocation(FVector(
+		-(FDSTRDungeonRules::GateThickness + FDSTRDungeonRules::GateEntryTriggerThickness) * 0.5f,
+		0.0f,
+		FDSTRDungeonRules::GateEntryTriggerHeight * 0.5f));
+	ApplyBars();
 }
 
 void ADSTRBossGate::OnRep_BarrierHalfWidth()
 {
 	ApplyBarrierSize();
+	// 맞춤 폭이 늦게 도착한 클라이언트는 커튼을 다시 쳐서 폭을 반영한다.
+	if (bCurtainCueActive)
+	{
+		SetCurtainCue(false);
+		SetCurtainCue(true);
+	}
+	ApplyBars();
 }
 
 void ADSTRBossGate::EndPlay(const EEndPlayReason::Type EndPlayReason)
@@ -168,6 +197,10 @@ void ADSTRBossGate::ApplyCollision()
 	Barrier->SetCollisionEnabled(bClosed ? ECollisionEnabled::QueryAndPhysics : ECollisionEnabled::NoCollision);
 	Barrier->SetCanEverAffectNavigation(bClosed);
 	EntryTrigger->SetCollisionEnabled(HasAuthority() && !bClosed && !bEntryConsumed
+		? ECollisionEnabled::QueryOnly
+		: ECollisionEnabled::NoCollision);
+	// 보스전 중 늦게 온 팀원은 바깥 트리거로 즉시 합류시킨다.
+	JoinTrigger->SetCollisionEnabled(HasAuthority() && GateState == EDSTRGateState::Locked
 		? ECollisionEnabled::QueryOnly
 		: ECollisionEnabled::NoCollision);
 }
@@ -213,9 +246,17 @@ void ADSTRBossGate::ApplyCurtain()
 	}
 
 	GateLight->SetVisibility(GateState != EDSTRGateState::Open);
+	for (UStaticMeshComponent* Bar : BarrierBars)
+	{
+		if (Bar)
+		{
+			Bar->SetVisibility(GateState != EDSTRGateState::Open);
+		}
+	}
 	GateLight->SetLightColor(
 		GateState == EDSTRGateState::Locked ? LockedLightColor : SealedLightColor);
-	SetCurtainCue(GateState == EDSTRGateState::Sealed);
+	// 폭풍 커튼은 보스를 가려 은퇴 — 차단 표현은 창살문과 조명이 전담한다.
+	SetCurtainCue(false);
 }
 
 void ADSTRBossGate::SetCurtainCue(const bool bActive)
@@ -230,6 +271,7 @@ void ADSTRBossGate::SetCurtainCue(const bool bActive)
 	FGameplayCueParameters Parameters;
 	Parameters.Location = Barrier->GetComponentLocation();
 	Parameters.Normal = GetActorRotation().Vector();
+	Parameters.RawMagnitude = BarrierHalfWidth;
 	CueManager->HandleGameplayCue(
 		this,
 		DSTRGameplayTags::GameplayCue_DSTR_GateSealed.GetTag(),
@@ -247,4 +289,89 @@ void ADSTRBossGate::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLif
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
 	DOREPLIFETIME(ADSTRBossGate, GateState);
 	DOREPLIFETIME(ADSTRBossGate, BarrierHalfWidth);
+}
+
+// 배리어가 보이지 않으면 투명벽처럼 느껴진다 — 팩 창살문을 폭에 맞춰 타일링한다.
+void ADSTRBossGate::ApplyBars()
+{
+	if (!FDSTRCombatFeedbackPolicy::ShouldPresent(GetNetMode())
+		|| !FDSTRVisualAssetRegistry::AreVisualAssetsLoaded(this))
+	{
+		return;
+	}
+	UStaticMesh* BarsMesh = Cast<UStaticMesh>(
+		FDSTRVisualAssetRegistry::GetGateBarsMesh().ResolveObject());
+	if (!BarsMesh)
+	{
+		return;
+	}
+
+	for (UStaticMeshComponent* Bar : BarrierBars)
+	{
+		if (Bar)
+		{
+			Bar->DestroyComponent();
+		}
+	}
+	BarrierBars.Reset();
+
+	const FBox MeshBox = BarsMesh->GetBoundingBox();
+	const FVector MeshSize = MeshBox.GetSize();
+	const bool bWideAxisX = MeshSize.X >= MeshSize.Y;
+	const float NativeWidth = FMath::Max(1.0f, static_cast<float>(bWideAxisX ? MeshSize.X : MeshSize.Y));
+	const float NativeHeight = FMath::Max(1.0f, static_cast<float>(MeshSize.Z));
+	const float Scale = FDSTRDungeonRules::GateHeight / NativeHeight;
+	const float BarWidth = NativeWidth * Scale;
+	const int32 BarCount = FMath::Clamp(
+		FMath::CeilToInt(BarrierHalfWidth * 2.0f / BarWidth), 1, 40);
+	const FRotator BarRotation(0.0f, bWideAxisX ? 90.0f : 0.0f, 0.0f);
+	const FVector PivotShift = BarRotation.RotateVector(MeshBox.GetCenter() * Scale);
+
+	for (int32 Index = 0; Index < BarCount; ++Index)
+	{
+		const float SlotY = -BarrierHalfWidth + BarWidth * (Index + 0.5f);
+		UStaticMeshComponent* Bar = NewObject<UStaticMeshComponent>(this);
+		Bar->SetStaticMesh(BarsMesh);
+		Bar->SetCollisionEnabled(ECollisionEnabled::NoCollision);
+		Bar->SetCanEverAffectNavigation(false);
+		Bar->SetupAttachment(GateRoot);
+		Bar->SetRelativeRotation(BarRotation);
+		Bar->SetRelativeScale3D(FVector(Scale));
+		Bar->SetRelativeLocation(FVector(
+			-PivotShift.X,
+			SlotY - PivotShift.Y,
+			-MeshBox.Min.Z * Scale));
+		Bar->SetVisibility(GateState != EDSTRGateState::Open);
+		Bar->RegisterComponent();
+		BarrierBars.Add(Bar);
+	}
+	UE_LOG(LogDSTR, Log, TEXT("DSTR_GATE_BARS Count=%d BarWidth=%.0f HalfWidth=%.0f"),
+		BarCount, BarWidth, BarrierHalfWidth);
+}
+
+// 보스전이 잠긴 뒤 밖에서 게이트에 닿은 팀원은 즉시 안으로 통과시킨다(일방통행).
+void ADSTRBossGate::HandleJoinOverlap(
+	UPrimitiveComponent*,
+	AActor* OtherActor,
+	UPrimitiveComponent*,
+	int32,
+	bool,
+	const FHitResult&)
+{
+	APawn* Pawn = Cast<APawn>(OtherActor);
+	if (!HasAuthority() || GateState != EDSTRGateState::Locked
+		|| !Pawn || !Pawn->IsPlayerControlled())
+	{
+		return;
+	}
+	const FVector Forward = GetGateForward().GetSafeNormal2D();
+	if (FVector::DotProduct(Pawn->GetActorLocation() - GetActorLocation(), Forward) > 0.0f)
+	{
+		return;
+	}
+	const FVector Destination = GetEntryPoint()
+		+ FVector(0.0f, 0.0f, Pawn->GetSimpleCollisionHalfHeight());
+	UE_LOG(LogDSTR, Log, TEXT("DSTR_GATE_JOIN Player=%s To=%s"),
+		*GetNameSafe(Pawn), *Destination.ToCompactString());
+	Pawn->TeleportTo(Destination, Pawn->GetActorRotation(), false, false);
 }

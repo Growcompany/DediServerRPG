@@ -450,3 +450,71 @@ FString UDSTRAnimationAuthoringLibrary::DescribeAnimation(UAnimationAsset* Asset
 	}
 	return Asset->GetName();
 }
+
+UAnimMontage* UDSTRAnimationAuthoringLibrary::CreateCompositeMontage(
+	const TArray<UAnimSequence*>& Sources, const TArray<float>& MaxSeconds, const FName SlotName,
+	const FString& PackagePath, const FString& AssetName, const float ImpactTimeSeconds)
+{
+#if WITH_EDITOR
+	if (Sources.IsEmpty() || !Sources[0])
+	{
+		return nullptr;
+	}
+
+	UAnimMontage* Montage = CreateCombatMontage(
+		Sources[0], SlotName, PackagePath, AssetName, -1.0f, false, -1.0f);
+	if (!Montage || Montage->SlotAnimTracks.Num() == 0)
+	{
+		return Montage;
+	}
+
+	// 첫 세그먼트를 기준으로 나머지를 이어붙이며 시작 위치를 누적한다.
+	TArray<FAnimSegment>& Segments = Montage->SlotAnimTracks[0].AnimTrack.AnimSegments;
+	Segments.Reset();
+	float Cursor = 0.0f;
+	for (int32 Index = 0; Index < Sources.Num(); ++Index)
+	{
+		UAnimSequence* Source = Sources[Index];
+		if (!Source)
+		{
+			continue;
+		}
+		const float Limit = MaxSeconds.IsValidIndex(Index) ? MaxSeconds[Index] : -1.0f;
+		const float Length = Limit > 0.0f
+			? FMath::Min(Source->GetPlayLength(), Limit)
+			: Source->GetPlayLength();
+
+		FAnimSegment Segment;
+		Segment.SetAnimReference(Source);
+		Segment.AnimStartTime = 0.0f;
+		Segment.AnimEndTime = Length;
+		Segment.AnimPlayRate = 1.0f;
+		Segment.LoopingCount = 1;
+		Segment.StartPos = Cursor;
+		Segments.Add(Segment);
+		Cursor += Length;
+	}
+	Montage->SetCompositeLength(Cursor);
+	Montage->BlendIn.SetBlendTime(0.05f);
+	Montage->BlendOut.SetBlendTime(0.15f);
+	Montage->bEnableAutoBlendOut = true;
+
+	if (ImpactTimeSeconds >= 0.0f)
+	{
+		UAnimationBlueprintLibrary::AddAnimationNotifyTrack(Montage, TEXT("Impact"), FLinearColor::Red);
+		UAnimationBlueprintLibrary::AddAnimationNotifyEvent(
+			Montage, TEXT("Impact"), ImpactTimeSeconds, UDSTRAnimNotify_Impact::StaticClass());
+	}
+
+	Montage->MarkPackageDirty();
+	FSavePackageArgs SaveArgs;
+	SaveArgs.TopLevelFlags = RF_Public | RF_Standalone;
+	const FString PackageName = PackagePath / AssetName;
+	const FString FileName = FPackageName::LongPackageNameToFilename(
+		PackageName, FPackageName::GetAssetPackageExtension());
+	UPackage::SavePackage(Montage->GetOutermost(), Montage, *FileName, SaveArgs);
+	return Montage;
+#else
+	return nullptr;
+#endif
+}

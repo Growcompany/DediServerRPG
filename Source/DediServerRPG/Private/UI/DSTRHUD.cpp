@@ -68,6 +68,6 @@ bool ADSTRHUD::TryCaptureMinimap()
 	{
 		return false;
 	}
-	CombatHUDWidget->SetMinimapSource(MinimapCapture->GetRenderTarget(), MinimapCapture->GetFrame());
+	CombatHUDWidget->SetMinimapSource(MinimapCapture);
 	return true;
 }

@@ -8,6 +8,7 @@
 
 class UBoxComponent;
 class UPointLightComponent;
+class UStaticMeshComponent;
 
 DECLARE_MULTICAST_DELEGATE_OneParam(FDSTRGateEnteredSignature, APawn*);
 
@@ -44,6 +45,14 @@ private:
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UBoxComponent> EntryTrigger;
 
+	// 잠긴 뒤 늦게 온 팀원을 안으로 통과시키는 바깥면 트리거(일방통행).
+	UPROPERTY(VisibleAnywhere)
+	TObjectPtr<UBoxComponent> JoinTrigger;
+
+	// 배리어를 눈에 보이게 하는 창살문(시각 전용, 폭에 맞춰 타일링).
+	UPROPERTY(Transient)
+	TArray<TObjectPtr<UStaticMeshComponent>> BarrierBars;
+
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<UPointLightComponent> GateLight;
 
@@ -61,6 +70,7 @@ private:
 
 	void FitToCorridor();
 	void ApplyBarrierSize();
+	void ApplyBars();
 
 	void ApplyCollision();
 
@@ -68,6 +78,14 @@ private:
 
 	UFUNCTION()
 	void HandleEntryOverlap(
+		UPrimitiveComponent* OverlappedComponent,
+		AActor* OtherActor,
+		UPrimitiveComponent* OtherComponent,
+		int32 OtherBodyIndex,
+		bool bFromSweep,
+		const FHitResult& SweepResult);
+	UFUNCTION()
+	void HandleJoinOverlap(
 		UPrimitiveComponent* OverlappedComponent,
 		AActor* OtherActor,
 		UPrimitiveComponent* OtherComponent,

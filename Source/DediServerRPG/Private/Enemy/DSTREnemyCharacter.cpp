@@ -154,10 +154,17 @@ void ADSTREnemyCharacter::StopSpawnEffect()
 
 void ADSTREnemyCharacter::OnRep_Dormant()
 {
+	ApplyDormantVisibility();
 	if (!bDormant)
 	{
 		PlayWakeEffect();
 	}
+}
+
+// 잠든 적이 보이면 보스가 매치 시작부터 서 있어 등장 연출이 죽는다.
+void ADSTREnemyCharacter::ApplyDormantVisibility()
+{
+	GetMesh()->SetHiddenInGame(bDormant && !bIsDead);
 }
 
 void ADSTREnemyCharacter::PlayWakeEffect()
@@ -171,7 +178,7 @@ void ADSTREnemyCharacter::PlayWakeEffect()
 		0.0f, 0.0f, GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
 			- FDSTRCombatPresentation::TelegraphFloorClearance);
 	if (UParticleSystem* Effect = Cast<UParticleSystem>(
-		FDSTRVisualAssetRegistry::GetMakeWayEffect().ResolveObject()))
+		FDSTRVisualAssetRegistry::GetWakeEffect().ResolveObject()))
 	{
 		UGameplayStatics::SpawnEmitterAtLocation(
 			GetWorld(), Effect, Floor, FRotator::ZeroRotator,
@@ -272,6 +279,7 @@ void ADSTREnemyCharacter::SetDormant(const bool bNewDormant)
 		return;
 	}
 	bDormant = bNewDormant;
+	ApplyDormantVisibility();
 	ForceNetUpdate();
 }
 
@@ -282,6 +290,7 @@ void ADSTREnemyCharacter::Wake(const TCHAR* Reason)
 		return;
 	}
 	bDormant = false;
+	ApplyDormantVisibility();
 	ForceNetUpdate();
 	PlayWakeEffect();
 	UE_LOG(LogDSTR, Log, TEXT("DSTR_ENEMY_WAKE Enemy=%s Boss=%s Reason=%s At=%s"),

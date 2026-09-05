@@ -22,13 +22,12 @@ namespace
 	const FDSTRCombatActionProfile FortifyProfile{
 		{AM(TEXT("Greystone"), TEXT("AM_Greystone_Fortify"))},
 		EDSTRVisualRole::Player, 0.0f, 0.85f, 1.15f, true, false, true, 0.5f};
-	const FDSTRCombatActionProfile MakeWayProfile{
-		{AM(TEXT("Greystone"), TEXT("AM_Greystone_MakeWay"))},
-		EDSTRVisualRole::Player, 0.57f, 2.2f, 1.4f, true, false, true, 0.9f, {0.80f}, 0.0f, 0.0f,
-		EDSTRImpactMetric::LowestPelvis};
 	const FDSTRCombatActionProfile ChargeProfile{
 		{AM(TEXT("Greystone"), TEXT("AM_Greystone_Charge"))},
 		EDSTRVisualRole::Player, 0.0f, 1.05f, 1.2f, false, false, true, 0.6f};
+	const FDSTRCombatActionProfile SmashProfile{
+		{AM(TEXT("Greystone"), TEXT("AM_Greystone_Smash"))},
+		EDSTRVisualRole::Player, 0.0f, 1.1f, 1.0f, true, false, true, 1.0f, {0.60f}};
 	const FDSTRCombatActionProfile ReckoningEntryProfile{
 		{AM(TEXT("Greystone"), TEXT("AM_Greystone_ReckoningEntry"))},
 		EDSTRVisualRole::Player, 0.0f, 1.0f, 0.97f, true, false, true, 1.0f};
@@ -100,8 +99,8 @@ const FDSTRCombatActionProfile& FDSTRCombatPresentation::GetProfile(
 	{
 	case EDSTRCombatAction::BasicAttack: return BasicAttackProfile;
 	case EDSTRCombatAction::Fortify: return FortifyProfile;
-	case EDSTRCombatAction::MakeWay: return MakeWayProfile;
 	case EDSTRCombatAction::Charge: return ChargeProfile;
+	case EDSTRCombatAction::Smash: return SmashProfile;
 	case EDSTRCombatAction::ReckoningEntry: return ReckoningEntryProfile;
 	case EDSTRCombatAction::Reckoning: return ReckoningProfile;
 	case EDSTRCombatAction::Revive: return ReviveProfile;

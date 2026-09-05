@@ -1,7 +1,9 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Combat/DSTRHitDebug.h"
 #include "Engine/NetSerialization.h"
+#include "Game/DSTRDungeonRules.h"
 #include "GameFramework/GameStateBase.h"
 #include "DSTRGameState.generated.h"
 
@@ -84,7 +86,7 @@ public:
 	void MarkBossIncoming();
 	void SetWaveSpawnGate(const FVector& Gate);
 	void SetPendingSpawnCount(int32 Count);
-	void SetBossRoom(const FVector& Room);
+	void SetBossRoom(const FVector& Room, float Radius, float HalfHeight);
 	void SetAdvancePath(const TArray<FVector>& Path);
 	void SetBossGate(const FVector& Gate);
 	void SetBossGateActor(ADSTRBossGate* Gate);
@@ -95,11 +97,16 @@ public:
 	void RecordRevived(const FString& ReviverName, const FString& TargetName);
 	void PushEvent(EDSTRMatchEventKind Kind, const FString& Subject = FString(), const FString& Object = FString());
 
+	UFUNCTION(NetMulticast, Unreliable)
+	void MulticastHitDebug(const FDSTRHitDebugFrame& Frame);
+
 	EDSTRMatchPhase GetMatchPhase() const { return MatchPhase; }
 	int32 GetRemainingEnemies() const { return RemainingEnemies; }
 	FVector GetWaveSpawnGate() const { return WaveSpawnGate; }
 	int32 GetPendingSpawnCount() const { return PendingSpawnCount; }
 	FVector GetBossRoom() const { return BossRoomLocation; }
+	float GetBossRoomRadius() const { return BossRoomRadius; }
+	float GetBossRoomHalfHeight() const { return BossRoomHalfHeight; }
 	const TArray<FVector>& GetAdvancePath() const { return AdvancePath; }
 	FVector GetBossGate() const { return BossGateLocation; }
 	ADSTRBossGate* GetBossGateActor() const { return BossGateActor; }
@@ -115,6 +122,8 @@ public:
 	FString GetPhaseDisplayName() const;
 
 	int32 GetHostPlayerId() const { return HostPlayerId; }
+	const FString& GetRoomName() const { return RoomName; }
+	void SetRoomName(const FString& Name);
 	bool IsHost(const APlayerState* PlayerState) const;
 	int32 CountPresentationReadyPlayers() const;
 	void SetHostPlayerId(int32 NewHostPlayerId);
@@ -122,6 +131,8 @@ public:
 	virtual void GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const override;
 
 private:
+	UPROPERTY(Replicated)
+	FString RoomName;
 	UPROPERTY(ReplicatedUsing = OnRep_MatchPhase)
 	EDSTRMatchPhase MatchPhase = EDSTRMatchPhase::WaitingForPlayers;
 
@@ -139,6 +150,12 @@ private:
 
 	UPROPERTY(Replicated)
 	FVector_NetQuantize BossRoomLocation = FVector::ZeroVector;
+
+	UPROPERTY(Replicated)
+	float BossRoomRadius = FDSTRDungeonRules::BossRoomRadius;
+
+	UPROPERTY(Replicated)
+	float BossRoomHalfHeight = FDSTRDungeonRules::BossRoomHalfHeight;
 
 	UPROPERTY(ReplicatedUsing = OnRep_AdvancePath)
 	TArray<FVector_NetQuantize> AdvancePathPoints;

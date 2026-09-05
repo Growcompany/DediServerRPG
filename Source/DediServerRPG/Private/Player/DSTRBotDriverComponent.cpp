@@ -231,12 +231,13 @@ void UDSTRBotDriverComponent::RunStep()
 	const ADSTRBossGate* Gate = State ? State->GetBossGateActor() : nullptr;
 	const bool bAdvancing = State && State->GetMatchPhase() == EDSTRMatchPhase::Advance;
 	const bool bLockedOutside = State && Gate && Gate->IsLocked()
-		&& FVector::Dist2D(SelfLocation, State->GetBossRoom()) > FDSTRDungeonRules::BossRoomRadius;
+		&& !FDSTRDungeonRules::IsInsideArena(
+			SelfLocation, State->GetBossRoom(), State->GetBossRoomRadius(), State->GetBossRoomHalfHeight());
 	if ((bAdvancing || bLockedOutside) && !bEnemyEngaged)
 	{
-		const FVector Goal = Gate && !Gate->IsSealed()
-			? Gate->GetEntryPoint()
-			: FDSTRDungeonRules::NextWaypoint(State->GetAdvancePath(), SelfLocation, State->GetBossRoom());
+		// 문이 열려도 복도 경유점을 따라간다. 멀리서 입구로 직진하면 벽에 걸린다.
+		const FVector Destination = Gate && !Gate->IsSealed() ? Gate->GetEntryPoint() : State->GetBossRoom();
+		const FVector Goal = FDSTRDungeonRules::NextWaypoint(State->GetAdvancePath(), SelfLocation, Destination);
 		const FVector ToGoal = Goal - SelfLocation;
 		if (ToGoal.Size2D() > FDSTRDungeonRules::AdvanceWaypointRadius)
 		{
@@ -285,13 +286,6 @@ void UDSTRBotDriverComponent::RunStep()
 		EnemiesInChargeScan, Character->IsAbilityReady(DSTRGameplayTags::Effect_Cooldown_Charge.GetTag())))
 	{
 		Character->PressAbilityInput(DSTRGameplayTags::InputTag_Ability_Charge.GetTag());
-	}
-	if (FDSTRDamageRules::ShouldBotLeap(
-		static_cast<float>(FMath::Sqrt(EnemyDistanceSquared)),
-		AimError,
-		Character->IsAbilityReady(DSTRGameplayTags::Effect_Cooldown_MakeWay.GetTag())))
-	{
-		Character->PressAbilityInput(DSTRGameplayTags::InputTag_Ability_MakeWay.GetTag());
 	}
 	if (NearestEnemy->IsBoss()
 		&& EnemyDistanceSquared <= FMath::Square(FDSTRDamageRules::ReckoningRadius)

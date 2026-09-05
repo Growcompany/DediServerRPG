@@ -1,32 +1,33 @@
 #pragma once
 
-#include "CoreMinimal.h"
 #include "AbilitySystem/Abilities/DSTRGameplayAbility.h"
-#include "DSTRMakeWayAbility.generated.h"
+#include "DSTRSmashAbility.generated.h"
 
+// RMB 대지 강타: 제자리에서 주변 광역 피해 + 넉백.
 UCLASS()
-class DEDISERVERRPG_API UDSTRMakeWayAbility : public UDSTRGameplayAbility
+class DEDISERVERRPG_API UDSTRSmashAbility : public UDSTRGameplayAbility
 {
 	GENERATED_BODY()
 
 public:
-	UDSTRMakeWayAbility();
+	UDSTRSmashAbility();
+
 	virtual void ActivateAbility(
 		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
 		const FGameplayAbilityActivationInfo ActivationInfo,
 		const FGameplayEventData* TriggerEventData) override;
 	virtual void EndAbility(
-		FGameplayAbilitySpecHandle Handle,
+		const FGameplayAbilitySpecHandle Handle,
 		const FGameplayAbilityActorInfo* ActorInfo,
-		FGameplayAbilityActivationInfo ActivationInfo,
+		const FGameplayAbilityActivationInfo ActivationInfo,
 		bool bReplicateEndAbility,
 		bool bWasCancelled) override;
 
 private:
-	void ExecuteLanding();
+	void ExecuteImpact();
 	void FinishRecovery();
-	FTimerHandle LandingTimerHandle;
+
+	FTimerHandle ImpactTimerHandle;
 	FTimerHandle RecoveryTimerHandle;
-	FVector LeapDirection = FVector::ForwardVector;
 };

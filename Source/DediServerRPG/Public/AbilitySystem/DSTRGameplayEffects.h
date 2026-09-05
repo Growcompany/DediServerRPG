@@ -78,11 +78,11 @@ public:
 };
 
 UCLASS()
-class DEDISERVERRPG_API UDSTRMakeWayCostEffect : public UGameplayEffect
+class DEDISERVERRPG_API UDSTRSmashCostEffect : public UGameplayEffect
 {
 	GENERATED_BODY()
 public:
-	UDSTRMakeWayCostEffect();
+	UDSTRSmashCostEffect();
 };
 
 UCLASS()
@@ -134,6 +134,22 @@ public:
 };
 
 UCLASS()
+class DEDISERVERRPG_API UDSTRSprintEffect : public UGameplayEffect
+{
+	GENERATED_BODY()
+public:
+	UDSTRSprintEffect();
+};
+
+UCLASS()
+class DEDISERVERRPG_API UDSTRSprintCostEffect : public UGameplayEffect
+{
+	GENERATED_BODY()
+public:
+	UDSTRSprintCostEffect();
+};
+
+UCLASS()
 class DEDISERVERRPG_API UDSTRStaminaRegenEffect : public UGameplayEffect
 {
 	GENERATED_BODY()
@@ -159,12 +175,12 @@ public:
 };
 
 UCLASS()
-class DEDISERVERRPG_API UDSTRMakeWayCooldownEffect : public UGameplayEffect
+class DEDISERVERRPG_API UDSTRSmashCooldownEffect : public UGameplayEffect
 {
 	GENERATED_BODY()
 public:
 	static constexpr float CooldownSeconds = 8.0f;
-	UDSTRMakeWayCooldownEffect();
+	UDSTRSmashCooldownEffect();
 };
 
 UCLASS()

@@ -28,6 +28,8 @@ private:
 	void HandleLeaveClicked();
 
 	UPROPERTY(Transient)
+	TObjectPtr<UTextBlock> TitleText;
+	UPROPERTY(Transient)
 	TObjectPtr<UTextBlock> HintText;
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UTextBlock>> SlotTexts;

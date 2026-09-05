@@ -27,7 +27,7 @@ public class DediServerRPG : ModuleRules
 			"SlateCore"
 		});
 
-		PrivateDependencyModuleNames.AddRange(new string[] { "Sockets" });
+		PrivateDependencyModuleNames.AddRange(new string[] { "Sockets", "Navmesh", "PhysicsCore" });
 
 		if (Target.bBuildEditor)
 		{

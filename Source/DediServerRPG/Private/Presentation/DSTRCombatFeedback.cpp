@@ -81,10 +81,10 @@ float FDSTRCombatFeedbackPolicy::GetShakeScale(
 		return Viewer == EDSTRFeedbackViewer::Instigator ? 0.15f : 0.0f;
 	case EDSTRCombatFeedback::Fortify:
 		return Viewer == EDSTRFeedbackViewer::Instigator ? 0.25f : 0.0f;
-	case EDSTRCombatFeedback::MakeWay:
-		return Viewer == EDSTRFeedbackViewer::Instigator ? 0.5f : 0.0f;
 	case EDSTRCombatFeedback::Charge:
 		return Viewer == EDSTRFeedbackViewer::Instigator ? 0.3f : 0.0f;
+	case EDSTRCombatFeedback::Smash:
+		return Viewer == EDSTRFeedbackViewer::Instigator ? 0.45f : 0.15f;
 	case EDSTRCombatFeedback::Reckoning:
 		return GetShakeScale(EDSTRCombatFeedback::BossImpact, Viewer, Distance, Radius);
 	case EDSTRCombatFeedback::HitDealt:

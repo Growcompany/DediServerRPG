@@ -26,13 +26,13 @@ protected:
 	virtual void EndPlay(const EEndPlayReason::Type EndPlayReason) override;
 
 private:
-	void ApplyPickupMesh();
+	void ApplyPickupOrb();
 
 	UPROPERTY(VisibleAnywhere)
 	TObjectPtr<USphereComponent> InteractionSphere;
 
 	UPROPERTY(VisibleAnywhere)
-	TObjectPtr<UStaticMeshComponent> PickupMesh;
+	TObjectPtr<class UParticleSystemComponent> PickupOrb;
 
 	UPROPERTY(ReplicatedUsing = OnRep_Consumed)
 	bool bConsumed = false;

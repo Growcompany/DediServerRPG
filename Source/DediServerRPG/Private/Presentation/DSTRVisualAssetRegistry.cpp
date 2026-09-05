@@ -59,7 +59,7 @@ namespace
 		TEXT("/Game/FXVarietyPack/Particles/P_ky_darkStorm.P_ky_darkStorm"));
 	const FSoftObjectPath FortifyEffect(
 		TEXT("/Game/FXVarietyPack/Particles/P_ky_healAura.P_ky_healAura"));
-	const FSoftObjectPath MakeWayEffect(
+	const FSoftObjectPath WakeEffect(
 		TEXT("/Game/FXVarietyPack/Particles/P_ky_shotShockwave.P_ky_shotShockwave"));
 	const FSoftObjectPath ChargeEffect(
 		TEXT("/Game/FXVarietyPack/Particles/P_ky_shotShockwave.P_ky_shotShockwave"));
@@ -68,16 +68,20 @@ namespace
 	const FSoftObjectPath GateSealedEffect(
 		TEXT("/Game/FXVarietyPack/Particles/P_ky_aquaStorm.P_ky_aquaStorm"));
 
-	const FSoftObjectPath AttackBuffPickupMesh(
-		TEXT("/Engine/BasicShapes/Sphere.Sphere"));
+	const FSoftObjectPath GateBarsMesh(
+		TEXT("/Game/MedievalDungeon/Meshes/Architecture/Dungeon/SM_Cell_Door.SM_Cell_Door"));
+
+	// 회색 기본 구 대신 불덩이 오브로 — "공격 버프"가 형태만으로 읽히게.
+	const FSoftObjectPath AttackBuffOrbEffect(
+		TEXT("/Game/FXVarietyPack/Particles/P_ky_fireBall.P_ky_fireBall"));
 
 	const FDSTRFeedbackSound EmptyFeedbackSound;
 	const FDSTRFeedbackSound BasicAttackSound{
 		FSoftObjectPath(TEXT("/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Swing.Greystone_Effort_Swing")), 0.8f, 1.0f};
 	const FDSTRFeedbackSound FortifySound{
 		FSoftObjectPath(TEXT("/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Ability_Q.Greystone_Effort_Ability_Q")), 0.9f, 1.0f};
-	const FDSTRFeedbackSound MakeWaySound{
-		FSoftObjectPath(TEXT("/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Ability_RMB.Greystone_Effort_Ability_RMB")), 0.9f, 1.0f};
+	const FDSTRFeedbackSound SmashSound{
+		FSoftObjectPath(TEXT("/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_Ability_RMB.Greystone_Effort_Ability_RMB")), 0.9f, 0.95f};
 	const FDSTRFeedbackSound ChargeSound{
 		FSoftObjectPath(TEXT("/Game/ParagonGreystone/Audio/Cues/Greystone_Effort_JumpHeavy.Greystone_Effort_JumpHeavy")), 0.9f, 0.9f};
 	const FDSTRFeedbackSound ReckoningWarningSound{
@@ -118,7 +122,7 @@ namespace
 		&BasicAttackSound, &HitDealtSound, &BossHitDealtSound,
 		&HitTakenSound, &DownedSound, &RevivedSound, &AttackBuffSound,
 		&EnemyTelegraphSound, &EnemyDeathSound, &BossDeathSound, &BossImpactSound,
-		&FortifySound, &MakeWaySound, &ChargeSound, &ReckoningWarningSound, &ReckoningSound,
+		&FortifySound, &SmashSound, &ChargeSound, &ReckoningWarningSound, &ReckoningSound,
 		&EnemyWakeSound, &BossWakeSound,
 		&BossRushSound, &BossSiphonSound, &BossSubjugateSound};
 
@@ -144,7 +148,7 @@ namespace
 		}
 		for (const EDSTRCombatAction Action : {
 			EDSTRCombatAction::BasicAttack, EDSTRCombatAction::Fortify,
-			EDSTRCombatAction::MakeWay, EDSTRCombatAction::Charge,
+			EDSTRCombatAction::Charge, EDSTRCombatAction::Smash,
 			EDSTRCombatAction::ReckoningEntry, EDSTRCombatAction::Reckoning,
 			EDSTRCombatAction::Revive,
 			EDSTRCombatAction::Downed, EDSTRCombatAction::Revived,
@@ -162,8 +166,8 @@ namespace
 		}
 		Paths.Append({BasicAttackEffect, DownedEffect,
 			ReviveEffect, AttackBuffEffect, EnemyImpactEffect, EnemyTelegraphEffect,
-			EnemySpawnEffect, FortifyEffect, MakeWayEffect, ChargeEffect, ReckoningEffect,
-			GateSealedEffect, AttackBuffPickupMesh});
+			EnemySpawnEffect, FortifyEffect, WakeEffect, ChargeEffect, ReckoningEffect,
+			GateSealedEffect, GateBarsMesh, AttackBuffOrbEffect});
 		for (const FDSTRFeedbackSound* Sound : AllFeedbackSounds)
 		{
 			Paths.Add(Sound->Path);
@@ -194,9 +198,9 @@ const FSoftObjectPath& FDSTRVisualAssetRegistry::GetBasicAttackEffect()
 	return BasicAttackEffect;
 }
 
-const FSoftObjectPath& FDSTRVisualAssetRegistry::GetMakeWayEffect()
+const FSoftObjectPath& FDSTRVisualAssetRegistry::GetWakeEffect()
 {
-	return MakeWayEffect;
+	return WakeEffect;
 }
 
 const FSoftObjectPath& FDSTRVisualAssetRegistry::GetChargeEffect()
@@ -249,9 +253,14 @@ const FSoftObjectPath& FDSTRVisualAssetRegistry::GetGateSealedEffect()
 	return GateSealedEffect;
 }
 
-const FSoftObjectPath& FDSTRVisualAssetRegistry::GetAttackBuffPickupMesh()
+const FSoftObjectPath& FDSTRVisualAssetRegistry::GetGateBarsMesh()
 {
-	return AttackBuffPickupMesh;
+	return GateBarsMesh;
+}
+
+const FSoftObjectPath& FDSTRVisualAssetRegistry::GetAttackBuffOrbEffect()
+{
+	return AttackBuffOrbEffect;
 }
 
 const FDSTRFeedbackSound& FDSTRVisualAssetRegistry::GetFeedbackSound(
@@ -264,10 +273,10 @@ const FDSTRFeedbackSound& FDSTRVisualAssetRegistry::GetFeedbackSound(
 		return BasicAttackSound;
 	case EDSTRCombatFeedback::Fortify:
 		return FortifySound;
-	case EDSTRCombatFeedback::MakeWay:
-		return MakeWaySound;
 	case EDSTRCombatFeedback::Charge:
 		return ChargeSound;
+	case EDSTRCombatFeedback::Smash:
+		return SmashSound;
 	case EDSTRCombatFeedback::ReckoningWarning:
 		return ReckoningWarningSound;
 	case EDSTRCombatFeedback::Reckoning:
@@ -301,6 +310,7 @@ const FDSTRFeedbackSound& FDSTRVisualAssetRegistry::GetFeedbackSound(
 	}
 }
 
+// ShouldPresent의 최종 조건. 데디 서버만 표현 생략
 bool FDSTRVisualAssetRegistry::ShouldLoadVisualAssets(const ENetMode NetMode)
 {
 	return NetMode != NM_DedicatedServer;

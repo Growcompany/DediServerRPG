@@ -1,4 +1,5 @@
 #include "AbilitySystem/DSTRGameplayEffects.h"
+#include "Player/DSTRHeroMovementTuning.h"
 
 #include "AbilitySystem/DSTRAttributeSet.h"
 #include "AbilitySystem/DSTRDamageExecution.h"
@@ -134,10 +135,10 @@ UDSTRFortifyCostEffect::UDSTRFortifyCostEffect()
 	AddScalableModifier(*this, UDSTRAttributeSet::GetStaminaAttribute(), EGameplayModOp::Additive, -20.0f);
 }
 
-UDSTRMakeWayCostEffect::UDSTRMakeWayCostEffect()
+UDSTRSmashCostEffect::UDSTRSmashCostEffect()
 {
 	DurationPolicy = EGameplayEffectDurationType::Instant;
-	AddScalableModifier(*this, UDSTRAttributeSet::GetStaminaAttribute(), EGameplayModOp::Additive, -25.0f);
+	AddScalableModifier(*this, UDSTRAttributeSet::GetStaminaAttribute(), EGameplayModOp::Additive, -20.0f);
 }
 
 UDSTRReckoningCostEffect::UDSTRReckoningCostEffect()
@@ -214,6 +215,33 @@ UDSTRSlowEffect::UDSTRSlowEffect()
 	ConfigureGrantedTag(*TargetTags, DSTRGameplayTags::State_Slowed.GetTag());
 }
 
+// 배율과 주기적 소모를 한 GE에 합치면 Period가 배율까지 매 틱 즉시적용해 영구 누적된다.
+UDSTRSprintEffect::UDSTRSprintEffect()
+{
+	DurationPolicy = EGameplayEffectDurationType::Infinite;
+	AddScalableModifier(
+		*this,
+		UDSTRAttributeSet::GetMoveSpeedAttribute(),
+		EGameplayModOp::Multiplicitive,
+		FDSTRHeroMovementTuning::SprintMoveScale);
+	UTargetTagsGameplayEffectComponent* TargetTags =
+		CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(TEXT("TargetTags"));
+	GEComponents.Add(TargetTags);
+	ConfigureGrantedTag(*TargetTags, DSTRGameplayTags::State_Sprinting.GetTag());
+}
+
+UDSTRSprintCostEffect::UDSTRSprintCostEffect()
+{
+	DurationPolicy = EGameplayEffectDurationType::Infinite;
+	Period = FScalableFloat(FDSTRHeroMovementTuning::SprintCostPeriod);
+	bExecutePeriodicEffectOnApplication = true;
+	AddScalableModifier(
+		*this,
+		UDSTRAttributeSet::GetStaminaAttribute(),
+		EGameplayModOp::Additive,
+		-FDSTRHeroMovementTuning::SprintStaminaPerSecond * FDSTRHeroMovementTuning::SprintCostPeriod);
+}
+
 UDSTRStaminaRegenEffect::UDSTRStaminaRegenEffect()
 {
 	DurationPolicy = EGameplayEffectDurationType::Infinite;
@@ -238,12 +266,12 @@ UDSTRFortifyCooldownEffect::UDSTRFortifyCooldownEffect()
 	ConfigureCooldown(*this, *TargetTags, CooldownSeconds, DSTRGameplayTags::Effect_Cooldown_Fortify.GetTag());
 }
 
-UDSTRMakeWayCooldownEffect::UDSTRMakeWayCooldownEffect()
+UDSTRSmashCooldownEffect::UDSTRSmashCooldownEffect()
 {
 	UTargetTagsGameplayEffectComponent* TargetTags =
 		CreateDefaultSubobject<UTargetTagsGameplayEffectComponent>(TEXT("TargetTags"));
 	GEComponents.Add(TargetTags);
-	ConfigureCooldown(*this, *TargetTags, CooldownSeconds, DSTRGameplayTags::Effect_Cooldown_MakeWay.GetTag());
+	ConfigureCooldown(*this, *TargetTags, CooldownSeconds, DSTRGameplayTags::Effect_Cooldown_Smash.GetTag());
 }
 
 UDSTRReckoningCooldownEffect::UDSTRReckoningCooldownEffect()

@@ -6,6 +6,7 @@
 #include "Combat/DSTRCombatLibrary.h"
 #include "Combat/DSTRCombatMath.h"
 #include "Combat/DSTRDamageRules.h"
+#include "Combat/DSTRHitDebug.h"
 #include "Combat/DSTRHitQuery.h"
 #include "Components/CapsuleComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
@@ -106,12 +107,22 @@ void UDSTRGameplayAbility::DamagePlayersInRange(
 	}
 	const FVector Forward = SourceAvatar->GetActorForwardVector();
 
+	UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::IsEnabled()
+		? UDSTRHitDebugSubsystem::Get(SourceAvatar->GetWorld()) : nullptr;
+	if (HitDebug)
+	{
+		HitDebug->Begin(SourceAvatar, Center, Reach, ConeHalfAngleDegrees, FName(SkillName));
+	}
 	TArray<ADediServerRPGCharacter*> Candidates;
 	FDSTRHitQuery::GatherPlayers(SourceAvatar, Center, Reach, Candidates);
 	for (ADediServerRPGCharacter* Target : Candidates)
 	{
 		if (AlreadyHit && AlreadyHit->Contains(Target))
 		{
+			if (HitDebug)
+			{
+				HitDebug->SetVerdict(SourceAvatar, Target, EDSTRHitVerdict::AlreadyHit);
+			}
 			continue;
 		}
 		const FVector ToTarget = Target->GetActorLocation() - Center;
@@ -120,7 +131,18 @@ void UDSTRGameplayAbility::DamagePlayersInRange(
 			: Reach;
 		if (!FDSTRCombatMath::IsHit(Forward, ToTarget, HitDistance, ConeHalfAngleDegrees))
 		{
+			if (HitDebug)
+			{
+				const bool bInCone = ConeHalfAngleDegrees <= 0.0f
+					|| FDSTRCombatMath::IsInFrontCone(Forward, ToTarget, ConeHalfAngleDegrees);
+				HitDebug->SetVerdict(SourceAvatar, Target,
+					bInCone ? EDSTRHitVerdict::OutOfReach : EDSTRHitVerdict::OutOfCone);
+			}
 			continue;
+		}
+		if (HitDebug)
+		{
+			HitDebug->SetVerdict(SourceAvatar, Target, EDSTRHitVerdict::Hit);
 		}
 		if (AlreadyHit)
 		{
@@ -159,5 +181,9 @@ void UDSTRGameplayAbility::DamagePlayersInRange(
 				(Target->GetActorLocation() - Center).GetSafeNormal(),
 				80.0f);
 		}
+	}
+	if (HitDebug)
+	{
+		HitDebug->Commit(SourceAvatar);
 	}
 }

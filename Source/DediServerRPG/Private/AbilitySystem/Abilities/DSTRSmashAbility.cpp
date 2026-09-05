@@ -1,30 +1,29 @@
-#include "AbilitySystem/Abilities/DSTRMakeWayAbility.h"
+#include "AbilitySystem/Abilities/DSTRSmashAbility.h"
 #include "DSTRLog.h"
 
-#include "Abilities/Tasks/AbilityTask_ApplyRootMotionJumpForce.h"
 #include "AbilitySystemComponent.h"
 #include "AbilitySystem/DSTRGameplayEffects.h"
 #include "AbilitySystem/DSTRGameplayTags.h"
 #include "Combat/DSTRCombatLibrary.h"
 #include "Combat/DSTRDamageRules.h"
+#include "Combat/DSTRHitDebug.h"
 #include "Combat/DSTRHitQuery.h"
 #include "Components/CapsuleComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
 #include "Enemy/DSTREnemyCharacter.h"
 #include "Engine/World.h"
-#include "GameFramework/RootMotionSource.h"
 #include "Presentation/DSTRCombatPresentation.h"
 #include "TimerManager.h"
 
-UDSTRMakeWayAbility::UDSTRMakeWayAbility()
+UDSTRSmashAbility::UDSTRSmashAbility()
 {
-	AbilityTags.AddTag(DSTRGameplayTags::Ability_Skill_MakeWay.GetTag());
+	AbilityTags.AddTag(DSTRGameplayTags::Ability_Skill_Smash.GetTag());
 	ActivationOwnedTags.AddTag(DSTRGameplayTags::State_Attacking.GetTag());
-	CostGameplayEffectClass = UDSTRMakeWayCostEffect::StaticClass();
-	CooldownGameplayEffectClass = UDSTRMakeWayCooldownEffect::StaticClass();
+	CostGameplayEffectClass = UDSTRSmashCostEffect::StaticClass();
+	CooldownGameplayEffectClass = UDSTRSmashCooldownEffect::StaticClass();
 }
 
-void UDSTRMakeWayAbility::ActivateAbility(
+void UDSTRSmashAbility::ActivateAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -45,48 +44,26 @@ void UDSTRMakeWayAbility::ActivateAbility(
 		return;
 	}
 
-	LeapDirection = Character->GetController()
-		? FRotator(0.0f, Character->GetControlRotation().Yaw, 0.0f).Vector()
-		: Character->GetActorForwardVector().GetSafeNormal2D();
-	const FRotator LeapRotation = LeapDirection.Rotation();
-	Character->SetActorRotation(FRotator(0.0f, LeapRotation.Yaw, 0.0f));
-	Character->StartCombatAction(EDSTRCombatAction::MakeWay);
-
-	const float Distance = FDSTRDamageRules::MakeWayLeapDistance;
-	const float LandingTime = FDSTRCombatPresentation::GetImpactDelay(EDSTRCombatAction::MakeWay, 0);
-	if (UAbilityTask_ApplyRootMotionJumpForce* JumpTask =
-		UAbilityTask_ApplyRootMotionJumpForce::ApplyRootMotionJumpForce(
-			this,
-			NAME_None,
-			FRotator(0.0f, LeapRotation.Yaw, 0.0f),
-			Distance,
-			FDSTRDamageRules::MakeWayLeapHeight,
-			LandingTime,
-			LandingTime,
-			true,
-			ERootMotionFinishVelocityMode::ClampVelocity,
-			FVector::ZeroVector,
-			0.0f,
-			nullptr,
-			nullptr))
-	{
-		JumpTask->ReadyForActivation();
-	}
+	Character->StartCombatAction(EDSTRCombatAction::Smash);
 
 	World->GetTimerManager().SetTimer(
 		RecoveryTimerHandle,
 		this,
-		&UDSTRMakeWayAbility::FinishRecovery,
-		FDSTRCombatPresentation::GetCancelDelay(EDSTRCombatAction::MakeWay, 0),
+		&UDSTRSmashAbility::FinishRecovery,
+		FDSTRCombatPresentation::GetCancelDelay(EDSTRCombatAction::Smash, 0),
 		false);
 	if (FDSTRCombatPresentation::ShouldScheduleAuthorityImpact(Character->HasAuthority()))
 	{
 		World->GetTimerManager().SetTimer(
-			LandingTimerHandle, this, &UDSTRMakeWayAbility::ExecuteLanding, LandingTime, false);
+			ImpactTimerHandle,
+			this,
+			&UDSTRSmashAbility::ExecuteImpact,
+			FDSTRCombatPresentation::GetImpactDelay(EDSTRCombatAction::Smash, 0),
+			false);
 	}
 }
 
-void UDSTRMakeWayAbility::ExecuteLanding()
+void UDSTRSmashAbility::ExecuteImpact()
 {
 	const FGameplayAbilityActorInfo* ActorInfo = GetCurrentActorInfo();
 	ADediServerRPGCharacter* Character = ActorInfo
@@ -98,51 +75,61 @@ void UDSTRMakeWayAbility::ExecuteLanding()
 	}
 
 	const FVector Center = Character->GetActorLocation();
+	const FVector Forward = Character->GetActorForwardVector().GetSafeNormal2D();
 	Character->PlayAbilityFeedback(
-		EDSTRCombatFeedback::MakeWay, Center, LeapDirection, FDSTRDamageRules::MakeWayLandingRadius);
+		EDSTRCombatFeedback::Smash, Center, Forward, FDSTRDamageRules::SmashRadius);
 
+	UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::IsEnabled()
+		? UDSTRHitDebugSubsystem::Get(World) : nullptr;
+	if (HitDebug)
+	{
+		HitDebug->Begin(Character, Center, FDSTRDamageRules::SmashRadius, 0.0f, TEXT("Smash"));
+	}
 	TArray<ADSTREnemyCharacter*> Candidates;
-	FDSTRHitQuery::GatherEnemies(Character, Center, FDSTRDamageRules::MakeWayLandingRadius, Candidates);
+	FDSTRHitQuery::GatherEnemies(Character, Center, FDSTRDamageRules::SmashRadius, Candidates);
 	for (ADSTREnemyCharacter* Enemy : Candidates)
 	{
-		const float Distance = static_cast<float>(FVector::Dist2D(Enemy->GetActorLocation(), Center));
-		const float CapsuleRadius = Enemy->GetCapsuleComponent()->GetScaledCapsuleRadius();
-		if (!FDSTRDamageRules::IsInLandingRadius(Distance, CapsuleRadius))
+		if (HitDebug)
 		{
-			continue;
+			HitDebug->SetVerdict(Character, Enemy, EDSTRHitVerdict::Hit);
 		}
-		UE_LOG(LogDSTR, Log, TEXT("DSTR_HIT Source=%s Target=%s Dist=%.0f Reach=%.0f Angle=%.0f Skill=MakeWay"),
+		const float Distance = static_cast<float>(FVector::Dist2D(Enemy->GetActorLocation(), Center));
+		UE_LOG(LogDSTR, Log, TEXT("DSTR_HIT Source=%s Target=%s Dist=%.0f Reach=%.0f Angle=%.0f Skill=Smash"),
 			*Character->GetName(), *Enemy->GetName(), Distance,
-			FDSTRDamageRules::MakeWayLandingRadius, 0.0f);
+			FDSTRDamageRules::SmashRadius, 0.0f);
 		if (UDSTRCombatLibrary::ApplyDamage(
 			ActorInfo->AbilitySystemComponent.Get(),
 			Enemy->GetAbilitySystemComponent(),
-			FDSTRDamageRules::MakeWayDamageMultiplier))
+			FDSTRDamageRules::SmashDamageMultiplier))
 		{
 			Enemy->AddThreat(Character, UDSTRCombatLibrary::GetOutgoingDamage(
-				ActorInfo->AbilitySystemComponent.Get(), FDSTRDamageRules::MakeWayDamageMultiplier));
+				ActorInfo->AbilitySystemComponent.Get(), FDSTRDamageRules::SmashDamageMultiplier));
 			Enemy->LaunchCharacter(
 				FDSTRDamageRules::KnockbackVelocity(
-					Center, Enemy->GetActorLocation(), LeapDirection,
-					FDSTRDamageRules::MakeWayKnockbackSpeed),
+					Center, Enemy->GetActorLocation(), Forward,
+					FDSTRDamageRules::SmashKnockbackSpeed),
 				true,
 				false);
 			if (!Enemy->IsCombatantDead())
 			{
-				Enemy->ApplyThrown(Character, FDSTRDamageRules::MakeWayStaggerSeconds);
+				Enemy->ApplyThrown(Character, FDSTRDamageRules::SmashStaggerSeconds);
 				Enemy->PlayAbilityFeedback(
 					Enemy->GetActorLocation(), 200.0f, EDSTRCombatFeedback::HitDealt, Character);
 			}
 		}
 	}
+	if (HitDebug)
+	{
+		HitDebug->Commit(Character);
+	}
 }
 
-void UDSTRMakeWayAbility::FinishRecovery()
+void UDSTRSmashAbility::FinishRecovery()
 {
 	FinishAbility(GetCurrentAbilitySpecHandle(), GetCurrentActorInfo(), GetCurrentActivationInfo());
 }
 
-void UDSTRMakeWayAbility::EndAbility(
+void UDSTRSmashAbility::EndAbility(
 	const FGameplayAbilitySpecHandle Handle,
 	const FGameplayAbilityActorInfo* ActorInfo,
 	const FGameplayAbilityActivationInfo ActivationInfo,
@@ -151,7 +138,7 @@ void UDSTRMakeWayAbility::EndAbility(
 {
 	if (ActorInfo && ActorInfo->AvatarActor.IsValid())
 	{
-		ActorInfo->AvatarActor->GetWorldTimerManager().ClearTimer(LandingTimerHandle);
+		ActorInfo->AvatarActor->GetWorldTimerManager().ClearTimer(ImpactTimerHandle);
 		ActorInfo->AvatarActor->GetWorldTimerManager().ClearTimer(RecoveryTimerHandle);
 	}
 	Super::EndAbility(Handle, ActorInfo, ActivationInfo, bReplicateEndAbility, bWasCancelled);

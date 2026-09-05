@@ -5,10 +5,11 @@
 namespace DSTRGameplayTags
 {
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Attack_Basic);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill_MakeWay);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill_Fortify);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill_Charge);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill_Smash);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill_Reckoning);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Skill_Sprint);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Interaction_Revive);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Reaction_Pulled);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Boss_ColossalBlow);
@@ -17,9 +18,10 @@ namespace DSTRGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Ability_Boss_Subjugate);
 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_BasicAttack);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_MakeWay);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_Fortify);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_Sprint);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_Charge);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_Smash);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_Reckoning);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(InputTag_Ability_Revive);
 
@@ -29,6 +31,7 @@ namespace DSTRGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Attacking);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Fortified);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Slowed);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(State_Sprinting);
 
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Damage);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Duration);
@@ -37,9 +40,9 @@ namespace DSTRGameplayTags
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Heal);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Buff_Attack);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_Attack);
-	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_MakeWay);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_Fortify);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_Charge);
+	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_Smash);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_Reckoning);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_EnemyAttack);
 	UE_DECLARE_GAMEPLAY_TAG_EXTERN(Effect_Cooldown_BossColossal);

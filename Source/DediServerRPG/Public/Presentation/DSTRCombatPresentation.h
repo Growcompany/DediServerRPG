@@ -23,8 +23,8 @@ enum class EDSTRCombatAction : uint8
 	EnemyHitReact,
 	BossHitReact,
 	Fortify,
-	MakeWay,
 	Charge,
+	Smash,
 	ReckoningEntry,
 	Reckoning,
 	BossColossal,
@@ -101,9 +101,10 @@ public:
 	static constexpr float BossStunEndSeconds = 0.73f;
 	static FStunSegments GetStunSegments(float StunSeconds);
 
-	static constexpr float CorpseLifetime = 8.0f;
-	static constexpr float BossCorpseLifetime = 12.0f;
-	static constexpr float CorpseSinkSeconds = 2.0f;
+	// 시체가 금방 치워지면 전투의 무게가 사라진다 — 충분히 눕혀둔 뒤 가라앉힌다.
+	static constexpr float CorpseLifetime = 20.0f;
+	static constexpr float BossCorpseLifetime = 30.0f;
+	static constexpr float CorpseSinkSeconds = 3.0f;
 	static constexpr float CorpseSinkSpeed = 60.0f;
 	static constexpr float BossCorpseSinkSpeed = 200.0f;
 	static float GetCorpseLifetime(bool bBoss) { return bBoss ? BossCorpseLifetime : CorpseLifetime; }

@@ -29,7 +29,7 @@ class DEDISERVERRPG_API UDSTRCombatHUDWidget : public UUserWidget
 	GENERATED_BODY()
 
 public:
-	void SetMinimapSource(UTextureRenderTarget2D* InRenderTarget, const FDSTRMinimapFrame& InFrame);
+	void SetMinimapSource(class ADSTRMinimapCapture* InCapture);
 
 	static constexpr int32 AbilityCardCount = 5;
 	static constexpr float AbilityPanelWidth = 550.0f;
@@ -194,9 +194,9 @@ private:
 	UPROPERTY(Transient)
 	TArray<TObjectPtr<UCanvasPanelSlot>> MinimapMarkerSlots;
 	UPROPERTY(Transient)
-	TObjectPtr<UTextureRenderTarget2D> MinimapRenderTarget;
+	TWeakObjectPtr<class ADSTRMinimapCapture> MinimapCapture;
+	int32 ActiveMinimapLayer = INDEX_NONE;
 	FDSTRMinimapFrame MinimapFrame;
-	bool bMinimapBrushApplied = false;
 	bool bMinimapPulseOn = false;
 	int32 PulseTicks = 0;
 

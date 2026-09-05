@@ -149,6 +149,7 @@ private:
 	bool bSpawnEffectPending = false;
 	void StopSpawnEffect();
 	void PlayWakeEffect();
+	void ApplyDormantVisibility();
 
 	void ApplyDeadCollision();
 

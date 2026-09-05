@@ -39,3 +39,50 @@ float FDSTRMinimapViewModel::PulseOpacity(const bool bPulseOn)
 {
 	return bPulseOn ? 1.0f : PulseMinOpacity;
 }
+
+TArray<FDSTRMinimapLayerBand> FDSTRMinimapViewModel::BuildLayerBands(
+	TArray<float> FloorHeights,
+	const float GapThreshold)
+{
+	TArray<FDSTRMinimapLayerBand> Bands;
+	if (FloorHeights.IsEmpty())
+	{
+		return Bands;
+	}
+	FloorHeights.Sort();
+
+	FDSTRMinimapLayerBand Current{FloorHeights[0], FloorHeights[0]};
+	for (int32 Index = 1; Index < FloorHeights.Num(); ++Index)
+	{
+		// 계단처럼 촘촘히 이어진 높이는 한 층으로 묶고, 빈 높이가 크면 층을 끊는다.
+		if (FloorHeights[Index] - Current.MaxZ > GapThreshold)
+		{
+			Bands.Add(Current);
+			Current = FDSTRMinimapLayerBand{FloorHeights[Index], FloorHeights[Index]};
+			continue;
+		}
+		Current.MaxZ = FloorHeights[Index];
+	}
+	Bands.Add(Current);
+	return Bands;
+}
+
+int32 FDSTRMinimapViewModel::FindLayer(const TArray<FDSTRMinimapLayerBand>& Bands, const float WorldZ)
+{
+	int32 Best = INDEX_NONE;
+	float BestScore = TNumericLimits<float>::Max();
+	for (int32 Index = 0; Index < Bands.Num(); ++Index)
+	{
+		// 캐릭터는 바닥 위에 서므로 발밑에서 가장 가까운 층이 자기 층이다.
+		const float Above = WorldZ - Bands[Index].MaxZ;
+		const float Score = Above >= -LayerStandTolerance
+			? Above
+			: FMath::Abs(Above) + LayerStandTolerance;
+		if (Score < BestScore)
+		{
+			BestScore = Score;
+			Best = Index;
+		}
+	}
+	return Best;
+}

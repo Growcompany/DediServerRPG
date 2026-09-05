@@ -17,7 +17,8 @@ bool FDSTRStallRules::HasProgressed(const FDSTRMatchProgress& Previous, const FD
 		|| Previous.DownCount != Current.DownCount
 		|| Previous.ReviveCount != Current.ReviveCount
 		|| Previous.BossHealth != Current.BossHealth
-		|| Previous.PlayersStanding != Current.PlayersStanding;
+		|| Previous.PlayersStanding != Current.PlayersStanding
+		|| Previous.BossApproachStep != Current.BossApproachStep;
 }
 
 bool FDSTRStallRules::ShouldFailForStall(const bool bMatchRunning, const float SecondsSinceProgress)

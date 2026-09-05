@@ -1,6 +1,7 @@
 #include "Combat/DSTRHitQuery.h"
 #include "DSTRLog.h"
 
+#include "Combat/DSTRHitDebug.h"
 #include "Components/CapsuleComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
 #include "Enemy/DSTREnemyCharacter.h"
@@ -42,7 +43,11 @@ FVector FDSTRHitQuery::GetSightOrigin(const AActor* Source, const FVector& Cente
 	return Center + FVector(0.0f, 0.0f, Height);
 }
 
-bool FDSTRHitQuery::HasLineOfSight(const AActor* Source, const FVector& Center, const AActor* Target)
+bool FDSTRHitQuery::HasLineOfSight(
+	const AActor* Source,
+	const FVector& Center,
+	const AActor* Target,
+	FVector* OutBlockPoint)
 {
 	const UWorld* World = Source ? Source->GetWorld() : nullptr;
 	if (!World || !Target)
@@ -57,6 +62,10 @@ bool FDSTRHitQuery::HasLineOfSight(const AActor* Source, const FVector& Center, 
 		Hit, GetSightOrigin(Source, Center), Target->GetActorLocation(), ECC_Visibility, Params))
 	{
 		return true;
+	}
+	if (OutBlockPoint)
+	{
+		*OutBlockPoint = Hit.ImpactPoint;
 	}
 	UE_LOG(LogDSTR, Verbose, TEXT("DSTR_LOS_BLOCKED Source=%s Target=%s By=%s"),
 		*GetNameSafe(Source), *GetNameSafe(Target), *GetNameSafe(Hit.GetActor()));
@@ -76,6 +85,8 @@ void FDSTRHitQuery::GatherEnemies(
 		return;
 	}
 
+	UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::IsEnabled()
+		? UDSTRHitDebugSubsystem::Get(World) : nullptr;
 	TArray<FOverlapResult> Overlaps;
 	SweepCandidates(*World, Source, Center, Radius, Overlaps);
 	for (const FOverlapResult& Overlap : Overlaps)
@@ -83,8 +94,20 @@ void FDSTRHitQuery::GatherEnemies(
 		ADSTREnemyCharacter* Enemy = Cast<ADSTREnemyCharacter>(Overlap.GetActor());
 		if (!Enemy || Enemy == Source || Enemy->IsCombatantDead()
 			|| Enemy->GetCombatTeam() != EDSTRCombatTeam::Enemy
-			|| OutTargets.Contains(Enemy)
-			|| !HasLineOfSight(Source, Center, Enemy))
+			|| OutTargets.Contains(Enemy))
+		{
+			continue;
+		}
+		FVector BlockPoint = FVector::ZeroVector;
+		const bool bVisible = HasLineOfSight(Source, Center, Enemy, &BlockPoint);
+		if (HitDebug)
+		{
+			HitDebug->RecordCandidate(
+				Source, Enemy,
+				bVisible ? EDSTRHitVerdict::NotSelected : EDSTRHitVerdict::SightBlocked,
+				BlockPoint);
+		}
+		if (!bVisible)
 		{
 			continue;
 		}
@@ -105,14 +128,28 @@ void FDSTRHitQuery::GatherPlayers(
 		return;
 	}
 
+	UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::IsEnabled()
+		? UDSTRHitDebugSubsystem::Get(World) : nullptr;
 	TArray<FOverlapResult> Overlaps;
 	SweepCandidates(*World, Source, Center, Radius, Overlaps);
 	for (const FOverlapResult& Overlap : Overlaps)
 	{
 		ADediServerRPGCharacter* Player = Cast<ADediServerRPGCharacter>(Overlap.GetActor());
 		if (!Player || Player == Source || Player->IsDowned()
-			|| OutTargets.Contains(Player)
-			|| !HasLineOfSight(Source, Center, Player))
+			|| OutTargets.Contains(Player))
+		{
+			continue;
+		}
+		FVector BlockPoint = FVector::ZeroVector;
+		const bool bVisible = HasLineOfSight(Source, Center, Player, &BlockPoint);
+		if (HitDebug)
+		{
+			HitDebug->RecordCandidate(
+				Source, Player,
+				bVisible ? EDSTRHitVerdict::NotSelected : EDSTRHitVerdict::SightBlocked,
+				BlockPoint);
+		}
+		if (!bVisible)
 		{
 			continue;
 		}

@@ -102,7 +102,7 @@ FString FDSTRLobbyViewModel::FormatLobbySlot(const int32 Slot, const FString& Na
 	return FString::Printf(TEXT("%d  %s  %s  %s"),
 		Slot,
 		*Name.Left(MaxNicknameLength).RightPad(MaxNicknameLength),
-		bHost ? TEXT("HOST") : TEXT("    "),
+		bHost ? TEXT("LEADER") : TEXT("      "),
 		bReady ? TEXT("READY") : TEXT("")).TrimEnd();
 }
 
@@ -187,6 +187,23 @@ FString FDSTRLobbyViewModel::FormatConnectionError(const FString& EngineReason)
 	if (Trimmed.Contains(TEXT("ServerFull"), ESearchCase::IgnoreCase))
 	{
 		return TEXT("SERVER FULL");
+	}
+	if (Trimmed.Contains(TEXT("MatchInProgress"), ESearchCase::IgnoreCase))
+	{
+		return TEXT("MATCH ALREADY IN PROGRESS");
+	}
+	if (Trimmed.Contains(TEXT("RoomUnavailable"), ESearchCase::IgnoreCase))
+	{
+		return TEXT("ANOTHER ROOM WAS CREATED. REFRESH AND TRY AGAIN");
+	}
+	if (Trimmed.Contains(TEXT("RoomNotFound"), ESearchCase::IgnoreCase)
+		|| Trimmed.Contains(TEXT("RoomChanged"), ESearchCase::IgnoreCase))
+	{
+		return TEXT("THAT ROOM HAS CLOSED. REFRESH THE ROOM LIST");
+	}
+	if (Trimmed.Contains(TEXT("InvalidRoomRequest"), ESearchCase::IgnoreCase))
+	{
+		return TEXT("INVALID ROOM NAME OR ROOM ID");
 	}
 	if (Trimmed.Contains(TEXT("HOST CLOSED"), ESearchCase::IgnoreCase) || Trimmed.Contains(TEXT("ConnectionLost"), ESearchCase::IgnoreCase))
 	{

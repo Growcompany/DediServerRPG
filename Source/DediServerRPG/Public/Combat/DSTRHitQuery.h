@@ -25,7 +25,11 @@ public:
 		float Radius,
 		TArray<ADediServerRPGCharacter*>& OutTargets);
 
-	static bool HasLineOfSight(const AActor* Source, const FVector& Center, const AActor* Target);
+	static bool HasLineOfSight(
+		const AActor* Source,
+		const FVector& Center,
+		const AActor* Target,
+		FVector* OutBlockPoint = nullptr);
 
 	static FVector GetSightOrigin(const AActor* Source, const FVector& Center);
 };

@@ -20,22 +20,6 @@ bool FDSTRDamageRules::ShouldBotCharge(const int32 EnemiesInRadius, const bool b
 	return bChargeReady && EnemiesInRadius >= ChargeBotEnemyCount;
 }
 
-bool FDSTRDamageRules::ShouldBotLeap(
-	const float Distance2D,
-	const float AimErrorDegrees,
-	const bool bLeapReady)
-{
-	return bLeapReady
-		&& Distance2D > MakeWayBotMinDistance
-		&& Distance2D <= MakeWayTargetSearchRadius
-		&& FMath::Abs(AimErrorDegrees) <= MakeWayBotAimToleranceDegrees;
-}
-
-bool FDSTRDamageRules::IsInLandingRadius(const float Distance2D, const float TargetCapsuleRadius)
-{
-	return Distance2D <= MakeWayLandingRadius + FMath::Max(0.0f, TargetCapsuleRadius);
-}
-
 FVector FDSTRDamageRules::KnockbackVelocity(
 	const FVector& Center,
 	const FVector& TargetLocation,

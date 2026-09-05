@@ -9,6 +9,7 @@
 #include "Game/DSTRGameState.h"
 #include "Camera/CameraComponent.h"
 #include "Components/CapsuleComponent.h"
+#include "Components/SkeletalMeshComponent.h"
 #include "GameFramework/CharacterMovementComponent.h"
 #include "GameFramework/SpringArmComponent.h"
 #include "GameFramework/Controller.h"
@@ -100,8 +101,8 @@ ADediServerRPGCharacter::ADediServerRPGCharacter(const FObjectInitializer& Objec
 
 	BasicAttackAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_BasicAttack"));
 	BasicAttackAction->ValueType = EInputActionValueType::Boolean;
-	MakeWayAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_MakeWay"));
-	MakeWayAction->ValueType = EInputActionValueType::Boolean;
+	SmashAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Smash"));
+	SmashAction->ValueType = EInputActionValueType::Boolean;
 	FortifyAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Fortify"));
 	FortifyAction->ValueType = EInputActionValueType::Boolean;
 	ChargeAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Charge"));
@@ -110,14 +111,17 @@ ADediServerRPGCharacter::ADediServerRPGCharacter(const FObjectInitializer& Objec
 	ReckoningAction->ValueType = EInputActionValueType::Boolean;
 	InteractAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Interact"));
 	InteractAction->ValueType = EInputActionValueType::Boolean;
+	SprintAction = CreateDefaultSubobject<UInputAction>(TEXT("IA_Sprint"));
+	SprintAction->ValueType = EInputActionValueType::Boolean;
 
 	CombatMappingContext = CreateDefaultSubobject<UInputMappingContext>(TEXT("IMC_DSTRCombat"));
 	CombatMappingContext->MapKey(BasicAttackAction, EKeys::LeftMouseButton);
-	CombatMappingContext->MapKey(MakeWayAction, EKeys::RightMouseButton);
+	CombatMappingContext->MapKey(SmashAction, EKeys::RightMouseButton);
 	CombatMappingContext->MapKey(FortifyAction, EKeys::Q);
 	CombatMappingContext->MapKey(ChargeAction, EKeys::E);
 	CombatMappingContext->MapKey(ReckoningAction, EKeys::R);
 	CombatMappingContext->MapKey(InteractAction, EKeys::F);
+	CombatMappingContext->MapKey(SprintAction, EKeys::LeftShift);
 
 }
 
@@ -163,6 +167,11 @@ void ADediServerRPGCharacter::UnPossessed()
 
 void ADediServerRPGCharacter::RemoveInputMappings()
 {
+	if (UDSTRAbilitySystemComponent* ASC = Cast<UDSTRAbilitySystemComponent>(GetAbilitySystemComponent());
+		ASC && ASC->GetAvatarActor() == this)
+	{
+		ASC->ClearAbilityInput();
+	}
 	if (UEnhancedInputLocalPlayerSubsystem* Subsystem = InputSubsystem.Get())
 	{
 		Subsystem->RemoveMappingContext(CombatMappingContext);
@@ -365,6 +374,8 @@ void ADediServerRPGCharacter::HandleOutOfHealth()
 		GetDefault<UDSTRDeadEffect>(),
 		1.0f,
 		ASC->MakeEffectContext()));
+	ASC->ClearAbilityInput();
+	ASC->CancelAbilities();
 	StartCombatAction(EDSTRCombatAction::Downed);
 	PlayAbilityFeedback(
 		EDSTRCombatFeedback::Downed,
@@ -588,11 +599,9 @@ void ADediServerRPGCharacter::MulticastCombatFeedback_Implementation(
 		EffectPath = &FDSTRVisualAssetRegistry::GetFortifyEffect();
 		Scale = FVector(0.4f);
 		break;
-	case EDSTRCombatFeedback::MakeWay:
 	case EDSTRCombatFeedback::Charge:
-		EffectPath = Feedback == EDSTRCombatFeedback::MakeWay
-			? &FDSTRVisualAssetRegistry::GetMakeWayEffect()
-			: &FDSTRVisualAssetRegistry::GetChargeEffect();
+	case EDSTRCombatFeedback::Smash:
+		EffectPath = &FDSTRVisualAssetRegistry::GetChargeEffect();
 		Scale = FDSTRCombatPresentation::GetGroundRingScale3D(Radius);
 		SpawnLocation.Z -= GetCapsuleComponent()->GetScaledCapsuleHalfHeight()
 			- FDSTRCombatPresentation::TelegraphFloorClearance;
@@ -962,7 +971,7 @@ void ADediServerRPGCharacter::TickFallRecovery()
 	{
 		FGameplayTagContainer ChargeTags;
 		ChargeTags.AddTag(DSTRGameplayTags::Ability_Skill_Charge.GetTag());
-		ChargeTags.AddTag(DSTRGameplayTags::Ability_Skill_MakeWay.GetTag());
+		ChargeTags.AddTag(DSTRGameplayTags::Ability_Skill_Smash.GetTag());
 		ChargeTags.AddTag(DSTRGameplayTags::Ability_Reaction_Pulled.GetTag());
 		ASC->CancelAbilities(&ChargeTags);
 	}
@@ -1009,11 +1018,14 @@ void ADediServerRPGCharacter::SetupPlayerInputComponent(UInputComponent* PlayerI
 		EnhancedInputComponent->BindAction(LookAction, ETriggerEvent::Triggered, this, &ADediServerRPGCharacter::Look);
 
 		EnhancedInputComponent->BindAction(BasicAttackAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleBasicAttackInput);
-		EnhancedInputComponent->BindAction(MakeWayAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleMakeWayInput);
+		EnhancedInputComponent->BindAction(SmashAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleSmashInput);
 		EnhancedInputComponent->BindAction(FortifyAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleFortifyInput);
 		EnhancedInputComponent->BindAction(ChargeAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleChargeInput);
 		EnhancedInputComponent->BindAction(ReckoningAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleReckoningInput);
 		EnhancedInputComponent->BindAction(InteractAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleInteractInput);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Started, this, &ADediServerRPGCharacter::HandleSprintPressed);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Completed, this, &ADediServerRPGCharacter::HandleSprintReleased);
+		EnhancedInputComponent->BindAction(SprintAction, ETriggerEvent::Canceled, this, &ADediServerRPGCharacter::HandleSprintReleased);
 	}
 	else
 	{
@@ -1031,14 +1043,22 @@ void ADediServerRPGCharacter::PressAbilityInput(const FGameplayTag& InputTag)
 	}
 }
 
+void ADediServerRPGCharacter::ReleaseAbilityInput(const FGameplayTag& InputTag)
+{
+	if (UDSTRAbilitySystemComponent* ASC = Cast<UDSTRAbilitySystemComponent>(GetAbilitySystemComponent()))
+	{
+		ASC->AbilityInputTagReleased(InputTag);
+	}
+}
+
 void ADediServerRPGCharacter::HandleBasicAttackInput()
 {
 	PressAbilityInput(DSTRGameplayTags::InputTag_Ability_BasicAttack.GetTag());
 }
 
-void ADediServerRPGCharacter::HandleMakeWayInput()
+void ADediServerRPGCharacter::HandleSmashInput()
 {
-	PressAbilityInput(DSTRGameplayTags::InputTag_Ability_MakeWay.GetTag());
+	PressAbilityInput(DSTRGameplayTags::InputTag_Ability_Smash.GetTag());
 }
 
 void ADediServerRPGCharacter::HandleFortifyInput()
@@ -1065,6 +1085,16 @@ bool ADediServerRPGCharacter::IsAbilityReady(const FGameplayTag& CooldownTag) co
 void ADediServerRPGCharacter::HandleInteractInput()
 {
 	PressAbilityInput(DSTRGameplayTags::InputTag_Ability_Revive.GetTag());
+}
+
+void ADediServerRPGCharacter::HandleSprintPressed()
+{
+	PressAbilityInput(DSTRGameplayTags::InputTag_Ability_Sprint.GetTag());
+}
+
+void ADediServerRPGCharacter::HandleSprintReleased()
+{
+	ReleaseAbilityInput(DSTRGameplayTags::InputTag_Ability_Sprint.GetTag());
 }
 
 void ADediServerRPGCharacter::Move(const FInputActionValue& Value)

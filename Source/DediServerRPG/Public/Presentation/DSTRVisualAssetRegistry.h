@@ -38,7 +38,7 @@ class DEDISERVERRPG_API FDSTRVisualAssetRegistry
 public:
 	static const FDSTRCharacterVisualAssets& GetCharacterVisual(EDSTRVisualRole Role);
 	static const FSoftObjectPath& GetBasicAttackEffect();
-	static const FSoftObjectPath& GetMakeWayEffect();
+	static const FSoftObjectPath& GetWakeEffect();
 	static const FSoftObjectPath& GetChargeEffect();
 	static const FSoftObjectPath& GetDownedEffect();
 	static const FSoftObjectPath& GetReviveEffect();
@@ -49,7 +49,8 @@ public:
 	static const FSoftObjectPath& GetFortifyEffect();
 	static const FSoftObjectPath& GetReckoningEffect();
 	static const FSoftObjectPath& GetGateSealedEffect();
-	static const FSoftObjectPath& GetAttackBuffPickupMesh();
+	static const FSoftObjectPath& GetGateBarsMesh();
+	static const FSoftObjectPath& GetAttackBuffOrbEffect();
 	static const FDSTRFeedbackSound& GetFeedbackSound(EDSTRCombatFeedback Feedback, bool bBossVariant);
 	static bool ShouldLoadVisualAssets(ENetMode NetMode);
 	static TArray<FSoftObjectPath> GetPreloadPaths();

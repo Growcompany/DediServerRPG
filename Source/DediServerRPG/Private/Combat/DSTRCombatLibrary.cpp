@@ -107,7 +107,8 @@ bool UDSTRCombatLibrary::ApplyDamage(
 	UAbilitySystemComponent* TargetASC,
 	const float AbilityMultiplier)
 {
-	if (!SourceASC || !CanApplyDamage(TargetASC))
+	if (!SourceASC || SourceASC->HasMatchingGameplayTag(DSTRGameplayTags::State_Dead.GetTag())
+		|| !CanApplyDamage(TargetASC))
 	{
 		return false;
 	}

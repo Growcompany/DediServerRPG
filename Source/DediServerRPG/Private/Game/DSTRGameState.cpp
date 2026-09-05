@@ -1,11 +1,13 @@
 #include "Game/DSTRGameState.h"
 #include "DSTRLog.h"
 
+#include "Combat/DSTRHitDebug.h"
 #include "Enemy/DSTREnemyCharacter.h"
 #include "World/DSTRBossGate.h"
 #include "GameFramework/PlayerState.h"
 #include "Net/UnrealNetwork.h"
 #include "Player/DSTRPlayerState.h"
+#include "Presentation/DSTRCombatFeedback.h"
 #include "UI/DSTRHUDViewModel.h"
 
 ADSTRGameState::ADSTRGameState()
@@ -82,11 +84,13 @@ void ADSTRGameState::SetPendingSpawnCount(const int32 Count)
 	}
 }
 
-void ADSTRGameState::SetBossRoom(const FVector& Room)
+void ADSTRGameState::SetBossRoom(const FVector& Room, const float Radius, const float HalfHeight)
 {
 	if (HasAuthority())
 	{
 		BossRoomLocation = Room;
+		BossRoomRadius = Radius;
+		BossRoomHalfHeight = HalfHeight;
 		ForceNetUpdate();
 	}
 }
@@ -216,6 +220,20 @@ void ADSTRGameState::PushEvent(const EDSTRMatchEventKind Kind, const FString& Su
 	ForceNetUpdate();
 }
 
+// unreliable. 프레임 유실돼도 판정 무영향
+void ADSTRGameState::MulticastHitDebug_Implementation(const FDSTRHitDebugFrame& Frame)
+{
+	// 데디 서버는 코스메틱 미로드 → 드로우는 클라만
+	if (!FDSTRCombatFeedbackPolicy::ShouldPresent(GetNetMode()))
+	{
+		return;
+	}
+	if (const UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::Get(GetWorld()))
+	{
+		HitDebug->Draw(Frame);
+	}
+}
+
 float ADSTRGameState::GetElapsedMatchSeconds() const
 {
 	return MatchStartServerTime > 0.0f
@@ -266,6 +284,15 @@ int32 ADSTRGameState::CountPresentationReadyPlayers() const
 	return ReadyCount;
 }
 
+void ADSTRGameState::SetRoomName(const FString& Name)
+{
+	if (HasAuthority())
+	{
+		RoomName = Name;
+		ForceNetUpdate();
+	}
+}
+
 void ADSTRGameState::SetHostPlayerId(const int32 NewHostPlayerId)
 {
 	if (HasAuthority())
@@ -279,11 +306,14 @@ void ADSTRGameState::SetHostPlayerId(const int32 NewHostPlayerId)
 void ADSTRGameState::GetLifetimeReplicatedProps(TArray<FLifetimeProperty>& OutLifetimeProps) const
 {
 	Super::GetLifetimeReplicatedProps(OutLifetimeProps);
+	DOREPLIFETIME(ADSTRGameState, RoomName);
 	DOREPLIFETIME(ADSTRGameState, MatchPhase);
 	DOREPLIFETIME(ADSTRGameState, RemainingEnemies);
 	DOREPLIFETIME(ADSTRGameState, WaveSpawnGate);
 	DOREPLIFETIME(ADSTRGameState, PendingSpawnCount);
 	DOREPLIFETIME(ADSTRGameState, BossRoomLocation);
+	DOREPLIFETIME(ADSTRGameState, BossRoomRadius);
+	DOREPLIFETIME(ADSTRGameState, BossRoomHalfHeight);
 	DOREPLIFETIME(ADSTRGameState, AdvancePathPoints);
 	DOREPLIFETIME(ADSTRGameState, BossGateLocation);
 	DOREPLIFETIME(ADSTRGameState, BossGateActor);

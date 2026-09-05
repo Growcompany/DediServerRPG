@@ -7,6 +7,7 @@
 #include "AbilitySystem/DSTRGameplayTags.h"
 #include "Combat/DSTRCombatLibrary.h"
 #include "Combat/DSTRDamageRules.h"
+#include "Combat/DSTRHitDebug.h"
 #include "Combat/DSTRHitQuery.h"
 #include "Components/CapsuleComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
@@ -110,21 +111,39 @@ void UDSTRChargeAbility::TickSweep()
 	}
 
 	const FVector Center = Character->GetActorLocation();
+	UDSTRHitDebugSubsystem* HitDebug = UDSTRHitDebugSubsystem::IsEnabled()
+		? UDSTRHitDebugSubsystem::Get(World) : nullptr;
+	if (HitDebug)
+	{
+		HitDebug->Begin(Character, Center, FDSTRDamageRules::ChargeSweepRadius, 0.0f, TEXT("Charge"));
+	}
 	TArray<ADSTREnemyCharacter*> Candidates;
 	FDSTRHitQuery::GatherEnemies(Character, Center, FDSTRDamageRules::ChargeSweepRadius, Candidates);
 	for (ADSTREnemyCharacter* Enemy : Candidates)
 	{
 		if (AlreadyHit.Contains(Enemy))
 		{
+			if (HitDebug)
+			{
+				HitDebug->SetVerdict(Character, Enemy, EDSTRHitVerdict::AlreadyHit);
+			}
 			continue;
 		}
 		const float Distance = static_cast<float>(FVector::Dist2D(Enemy->GetActorLocation(), Center));
 		if (!FDSTRDamageRules::IsInChargeSweep(
 			Distance, Enemy->GetCapsuleComponent()->GetScaledCapsuleRadius()))
 		{
+			if (HitDebug)
+			{
+				HitDebug->SetVerdict(Character, Enemy, EDSTRHitVerdict::OutOfReach);
+			}
 			continue;
 		}
 		AlreadyHit.Add(Enemy);
+		if (HitDebug)
+		{
+			HitDebug->SetVerdict(Character, Enemy, EDSTRHitVerdict::Hit);
+		}
 		UE_LOG(LogDSTR, Log, TEXT("DSTR_HIT Source=%s Target=%s Dist=%.0f Reach=%.0f Angle=%.0f Skill=Charge"),
 			*Character->GetName(), *Enemy->GetName(), Distance, FDSTRDamageRules::ChargeSweepRadius, 0.0f);
 		if (UDSTRCombatLibrary::ApplyDamage(
@@ -144,6 +163,10 @@ void UDSTRChargeAbility::TickSweep()
 					Enemy->GetActorLocation(), 180.0f, EDSTRCombatFeedback::HitDealt, Character);
 			}
 		}
+	}
+	if (HitDebug)
+	{
+		HitDebug->Commit(Character);
 	}
 }
 

@@ -3,13 +3,17 @@
 #pragma once
 
 #include "CoreMinimal.h"
+#include "Game/DSTRDungeonRules.h"
 #include "Game/DSTRStallRules.h"
+#include "Game/DSTRServerStatus.h"
+#include "Game/DSTRRoomSession.h"
 #include "GameFramework/GameModeBase.h"
 #include "DediServerRPGGameMode.generated.h"
 
 class ADediServerRPGCharacter;
 class ADSTRBossGate;
 class ADSTREnemyCharacter;
+class UNavigationSystemV1;
 enum class EDSTRGateState : uint8;
 
 UCLASS(minimalapi)
@@ -19,11 +23,14 @@ class ADediServerRPGGameMode : public AGameModeBase
 
 public:
 	ADediServerRPGGameMode();
+	virtual void InitGame(const FString& MapName, const FString& Options, FString& ErrorMessage) override;
 	virtual void PreLogin(
 		const FString& Options,
 		const FString& Address,
 		const FUniqueNetIdRepl& UniqueId,
 		FString& ErrorMessage) override;
+	virtual APlayerController* Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal,
+		const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage) override;
 	virtual void PostLogin(APlayerController* NewPlayer) override;
 	virtual void Logout(AController* Exiting) override;
 	virtual void BeginPlay() override;
@@ -37,18 +44,23 @@ public:
 	static FVector GetBossSpawnOffset();
 	static bool IsReviveSmokeEnabled(const FString& CommandLine);
 	static bool IsStallSmokeEnabled(const FString& CommandLine);
-	static bool CanAcceptPlayerCount(int32 CurrentPlayerCount) { return CurrentPlayerCount < 4; }
+	static bool CanAcceptPlayerCount(int32 CurrentPlayerCount) { return CurrentPlayerCount < FDSTRServerStatus::MaxPlayers; }
 	static FVector GetStableEncounterOrigin(const TArray<FVector>& PlayerStarts);
 	void HandlePlayerDowned(ADediServerRPGCharacter* Character);
 	FVector GetMatchOrigin() const { return EncounterOrigin; }
 
 private:
+	FString GetAdmissionError(const FString& Options);
+	FDSTRRoomSession RoomSession;
+	void ResetEmptyDedicatedServer();
 	void BeginStartCountdown();
 	void TryAutoStart();
 	void StartEncounter();
 	void SpawnWave();
 	void SpawnNextWaveEnemy();
 	bool ResolveBossRoom();
+	bool ResolveBossRoomFromMarker(UWorld* World, UNavigationSystemV1* Navigation);
+	bool ResolveBossRoomByScan(UWorld* World, UNavigationSystemV1* Navigation);
 	TArray<FVector> CollectFloorTileCentres(TArray<FVector>& OutTiles) const;
 	bool PlaceDormantBoss();
 	void BeginAdvance();
@@ -83,8 +95,11 @@ private:
 	FTimerHandle WaveSpawnTimer;
 	FTimerHandle NavProbeTimer;
 	int32 NavProbeAttempts = 0;
+	float EncounterNavWaitSeconds = 0.0f;
 	TArray<FVector> DoorSpawnPoints;
 	FVector BossRoomLocation = FVector::ZeroVector;
+	float ArenaRadius = FDSTRDungeonRules::BossRoomRadius;
+	float ArenaHalfHeight = FDSTRDungeonRules::BossRoomHalfHeight;
 	TArray<FVector> AdvancePath;
 	TWeakObjectPtr<ADSTREnemyCharacter> DormantBoss;
 	TWeakObjectPtr<ADSTRBossGate> BossGate;
