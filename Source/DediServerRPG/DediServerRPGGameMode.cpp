@@ -98,11 +98,12 @@ void ADediServerRPGGameMode::PreLogin(
 			Status.Phase = State->GetMatchPhase();
 			Status.bCountdown = State->IsCountdownActive();
 		}
-		// A protocol reply closes this handshake before Welcome/Join can allocate a player.
+		// 조회 응답은 ErrorMessage로 돌려 Welcome/Join 전에 종료(참가자 생성 없음)
 		ErrorMessage = Status.Encode();
 		return;
 	}
 	Super::PreLogin(Options, Address, UniqueId, ErrorMessage);
+	// PreLogin은 검사만. 상태 변경 없음 → 취소된 로딩이 방을 점유하지 않음
 	if (ErrorMessage.IsEmpty())
 	{
 		ErrorMessage = GetAdmissionError(Options);
@@ -111,6 +112,7 @@ void ADediServerRPGGameMode::PreLogin(
 
 FString ADediServerRPGGameMode::GetAdmissionError(const FString& Options)
 {
+	// 생성·입장 공통 관문. PreLogin과 Login이 같은 검사를 공유
 	const FString RoomError = RoomSession.CheckLogin(FDSTRRoomRequest::FromOptions(Options));
 	if (!RoomError.IsEmpty())
 	{
@@ -131,13 +133,14 @@ FString ADediServerRPGGameMode::GetAdmissionError(const FString& Options)
 APlayerController* ADediServerRPGGameMode::Login(UPlayer* NewPlayer, ENetRole InRemoteRole, const FString& Portal,
 	const FString& Options, const FUniqueNetIdRepl& UniqueId, FString& ErrorMessage)
 {
-	// Capacity or countdown may change while an accepted connection is loading the map.
+	// 맵 로딩 중 정원·카운트다운이 바뀔 수 있음 → 최종 Login에서 재검사
 	ErrorMessage = GetAdmissionError(Options);
 	if (!ErrorMessage.IsEmpty())
 	{
 		return nullptr;
 	}
 	APlayerController* Controller = Super::Login(NewPlayer, InRemoteRole, Portal, Options, UniqueId, ErrorMessage);
+	// 컨트롤러 생성 성공 후에만 방 확정 → 동시 생성은 하나만 살아남음
 	if (Controller && RoomSession.Create(FDSTRRoomRequest::FromOptions(Options)))
 	{
 		if (ADSTRGameState* State = GetGameState<ADSTRGameState>())

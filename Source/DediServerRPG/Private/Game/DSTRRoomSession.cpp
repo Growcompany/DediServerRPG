@@ -94,11 +94,13 @@ FString FDSTRRoomSession::CheckLogin(const FDSTRRoomRequest& Request) const
 	{
 		return TEXT("RoomNotFound");
 	}
+	// GUID 불일치=같은 포트에 새로 생긴 다른 방 → 잘못된 입장 차단
 	return Request.RoomId == RoomId ? FString() : TEXT("RoomChanged");
 }
 
 bool FDSTRRoomSession::Create(const FDSTRRoomRequest& Request)
 {
+	// CheckLogin 재통과 후에만 확정. 실패 시 기존 방 유지
 	if (!bEnabled || !Request.bCreate || !CheckLogin(Request).IsEmpty())
 	{
 		return false;
