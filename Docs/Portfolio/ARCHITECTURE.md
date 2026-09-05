@@ -1,5 +1,13 @@
 # 아키텍처
 
+## 이름을 정하는 여러 방
+
+포트폴리오 운영 범위는 동시 3개 방, 방당 4명입니다. 고정된 전용 서버 프로세스 세 개가 독립된 월드·적·매치 상태를 소유하고, 클라이언트가 각 게임 UDP 연결에서 읽기 전용 상태를 조회합니다. 별도 마스터 서버·DB·동적 프로세스 생성 서비스는 두지 않습니다.
+
+빈 프로세스는 생성할 자리이고, 플레이어가 이름을 정해 최종 Login까지 성공해야 방이 됩니다. PreLogin 검사는 상태를 바꾸지 않아 취소된 로딩이 방을 점유하지 않습니다. 생성 요청은 UTF-8 base64 이름과 GUID를 보내며, 동시 요청은 게임 스레드의 최종 Login 검사에서 하나만 확정합니다. 방 목록 JOIN도 GUID를 전달하므로 같은 포트의 다음 방에 잘못 입장하지 않습니다.
+
+GameState는 방 이름과 방장·준비·진행 상태를 복제합니다. 방장이 나가면 남은 플레이어에게 권한을 이전하고, 마지막 퇴장 시 해당 서버만 월드를 다시 열어 빈자리로 반환합니다. 상태 조회용 NetDriver는 참가자나 PlayerController를 만들지 않으며, 서버별 요청 수명과 응답 시각을 따로 관리합니다. 조회 중이거나 오래된 응답으로 생성/입장하지 않습니다.
+
 ## 설계 목표
 
 DediServerRPG의 런타임 구조는 다음 세 가지 경계를 우선합니다.
@@ -74,6 +82,23 @@ ASC와 AttributeSet은 Pawn이 아니라 `ADSTRPlayerState`에 있습니다. Paw
 6. `UDSTRDamageExecution`과 AttributeSet이 최종 체력 변화를 처리합니다.
 
 공격 범위와 각도는 공통 전투 수학/히트 쿼리에서 계산합니다. 피격 이펙트와 사운드는 `ApplyDamage`가 성공한 뒤에만 요청해, 공격 시도와 서버 확정 타격을 구분합니다.
+
+기술마다 판정 형태는 다르지만 후보 수집은 `FDSTRHitQuery`, 최종 피해는 `ApplyDamage` 한 곳으로 수렴합니다.
+
+| 기술 | 판정 형태 | 서버 진입점 |
+|---|---|---|
+| 기본 공격 | 전방 콘 + 가시선, 가장 가까운 1명 | `UDSTRBasicAttackAbility::ExecuteImpact` |
+| Smash | 시전자 중심 구 | `UDSTRSmashAbility::ExecuteImpact` |
+| Assault | 이동 중 반경 스윕, 같은 시전에서 중복 제외 | `UDSTRChargeAbility::TickSweep` |
+| Reckoning | 예고 뒤 구 | `UDSTRReckoningAbility::ExecuteBlast` |
+| Fortify | 판정 없음. 자기 GameplayEffect와 반경 도발 | `UDSTRFortifyAbility::ActivateAbility` |
+| 부활 / 버프 픽업 | 거리·상태를 서버가 재검사 | `UDSTRCombatLibrary::IsReviveRequestValid`, `CanConsumePickup` |
+| 일반 적 근접, Colossal Blow | 전방 콘 | `UDSTRGameplayAbility::DamagePlayersInRange` |
+| Phantom Rush | 돌진 중 반경 스윕 | `UDSTRGameplayAbility::DamagePlayersInRange` |
+| Subjugate | 예고 뒤 구 | `UDSTRGameplayAbility::DamagePlayersInRange` |
+| Siphon | 끌어당긴 뒤 단일 대상 | `UDSTRBossSiphonAbility` → `ApplyDamage` |
+
+콘솔 변수 `DSTR.Debug.HitQuery`를 서버에서 켜면 이 판정 프레임을 클라이언트가 디버그 드로우로 그립니다. 서버는 데이터만 보내고 시각 자산은 로드하지 않습니다.
 
 ## 다운과 부활
 
@@ -201,7 +226,7 @@ HUD는 `GameState`와 `PlayerState`를 읽는 ViewModel을 거쳐 표시 값을 
 
 관문 배리어는 닫힌 동안 충돌, 내비 관련성, `bDynamicObstacle`, `NavArea_Null`을 함께 활성화하고 열릴 때 함께 해제합니다.
 
-출시 맵의 저장된 Recast NavMesh는 현재 스폰 문 10개 중 2개만 조우 원점까지 완전 경로를 가집니다. 런타임은 이 사실을 감지해 유효한 문만 사용하지만, 근본 해결은 레벨 구조와 충돌을 함께 수정하는 작업입니다.
+출시 맵의 저장된 Recast NavMesh는 현재 스폰 문 10개 중 7개가 조우 원점까지 완전 경로를 가집니다. 얇은 바닥 메시의 NavCollision 퇴화를 컴포넌트 단위로 우회하고 정적 내비를 다시 구워 2개에서 7개로 늘렸습니다. 런타임은 유효한 문만 사용하며, 남은 3개는 레벨 구조와 충돌을 함께 수정하는 범위입니다.
 
 ## 확장 원칙
 

@@ -1,6 +1,6 @@
 # DediServerRPG
 
-Unreal Engine 5.4와 C++로 만든 1~4인 3인칭 협동 RPG 포트폴리오입니다. 전용 서버 권한, Gameplay Ability System(GAS), Behavior Tree/Blackboard, 복제 UI를 한 판의 흐름으로 연결하는 데 초점을 맞췄습니다.
+Unreal Engine 5.4와 C++로 만든 1~4인 3인칭 협동 액션 포트폴리오입니다. 전용 서버 권한, Gameplay Ability System(GAS), Behavior Tree/Blackboard, 복제 UI를 한 판의 흐름으로 연결하는 데 초점을 맞췄습니다.
 
 > 이 저장소는 코드 검토용 공개본입니다. 상용 에셋의 재배포를 피하기 위해 `Content`, `Config`, 프로젝트 파일과 제작 스크립트는 포함하지 않으며, 저장소만으로 게임을 실행할 수는 없습니다.
 
@@ -10,13 +10,14 @@ Unreal Engine 5.4와 C++로 만든 1~4인 3인칭 협동 RPG 포트폴리오입�
 |---|---|
 | 엔진 | Unreal Engine 5.4 |
 | 개발 | C++, GAS, Enhanced Input, UMG |
-| 네트워크 | Dedicated Server, 최대 4인, 서버 권한 판정 |
+| 네트워크 | Dedicated Server, 방당 최대 4인·동시 3개 방, 서버 권한 판정 |
 | 게임 흐름 | 접속 → 로비 → 웨이브 → 전진/관문 → 보스 → 결과 |
 | 전투 | 플레이어 전투 기술 5종 + 부활, 보스 기술 4종 |
 | AI | 서버 전용 Behavior Tree + Blackboard |
 
 ## 핵심 구현
 
+- 이름을 정해 방을 만들고 목록에서 입장하며, 세 전용 서버가 각 방의 월드와 진행을 독립적으로 유지합니다.
 - 데미지, 상태 변화, 스폰, 부활, 버프 소비, 매치 전이는 서버에서만 확정합니다.
 - 플레이어의 ASC와 AttributeSet은 `PlayerState`가 소유해 Pawn 재생성과 능력 수명을 분리했습니다.
 - 적의 의사결정과 런타임 상태는 Behavior Tree/Blackboard가 담당하고, 판정 규칙과 원자적 동작만 C++로 구성했습니다.
