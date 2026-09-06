@@ -445,7 +445,7 @@ bool ADediServerRPGCharacter::TryReviveNearestFromServer()
 	}
 	return false;
 }
-
+// 부활 확정은 서버만. 권한 + 부활 가능 조건 이중 검사
 bool ADediServerRPGCharacter::ReviveFromServer(ADediServerRPGCharacter* Reviver)
 {
 	if (!HasAuthority() || !CanBeRevivedBy(Reviver))
@@ -476,6 +476,7 @@ bool ADediServerRPGCharacter::ReviveFromServer(ADediServerRPGCharacter* Reviver)
 		1.0f,
 		ASC->MakeEffectContext());
 	ASC->ApplyGameplayEffectToSelf(
+		// 부활 직후 2.5초 무적
 		GetDefault<UDSTRReviveProtectionEffect>(),
 		1.0f,
 		ASC->MakeEffectContext());

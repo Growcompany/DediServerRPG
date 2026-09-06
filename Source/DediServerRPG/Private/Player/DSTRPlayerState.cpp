@@ -73,6 +73,7 @@ void ADSTRPlayerState::MarkEliminated()
 	}
 }
 
+// 서버·클라 모두 같은 순수 함수로 잔여 시간 계산
 float ADSTRPlayerState::GetBleedOutRemaining() const
 {
 	const AGameStateBase* State = GetWorld() ? GetWorld()->GetGameState() : nullptr;

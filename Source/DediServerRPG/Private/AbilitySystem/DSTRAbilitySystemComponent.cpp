@@ -77,6 +77,7 @@ void UDSTRAbilitySystemComponent::AbilityInputTagPressed(const FGameplayTag& Inp
 	}
 
 	ABILITYLIST_SCOPE_LOCK();
+	// 입력은 InputTag 일치로만 어빌리티를 찾는다. 클래스 참조 없음
 	for (FGameplayAbilitySpec& AbilitySpec : GetActivatableAbilities())
 	{
 		if (AbilitySpec.DynamicAbilityTags.HasTagExact(InputTag))

@@ -96,7 +96,7 @@ public:
 	void RecordDowned(const FString& PlayerName);
 	void RecordRevived(const FString& ReviverName, const FString& TargetName);
 	void PushEvent(EDSTRMatchEventKind Kind, const FString& Subject = FString(), const FString& Object = FString());
-
+	// 진단 데이터라 유실돼도 무방 → Unreliable
 	UFUNCTION(NetMulticast, Unreliable)
 	void MulticastHitDebug(const FDSTRHitDebugFrame& Frame);
 

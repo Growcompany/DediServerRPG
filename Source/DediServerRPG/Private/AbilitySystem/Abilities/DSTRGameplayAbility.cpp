@@ -11,7 +11,7 @@
 #include "Components/CapsuleComponent.h"
 #include "DediServerRPG/DediServerRPGCharacter.h"
 #include "Engine/World.h"
-
+// 정책과 차단 태그는 베이스 한 곳에서 고정. 파생 어빌리티는 재정의하지 않는다
 UDSTRGameplayAbility::UDSTRGameplayAbility()
 {
 	InstancingPolicy = EGameplayAbilityInstancingPolicy::InstancedPerActor;
@@ -41,6 +41,7 @@ void UDSTRGameplayAbility::PreActivate(
 	}
 }
 
+// 소유 클라에서 실행되는 정책이면 Minimal 복제 태그로, 아니면 Loose 복제 태그로
 void UDSTRGameplayAbility::RouteActivationOwnedTagsForReplication(
 	UAbilitySystemComponent& ASC,
 	const bool bAdd) const

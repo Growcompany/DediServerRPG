@@ -44,7 +44,7 @@ void ADSTRGameState::StartMatchFlow()
 	MatchStartServerTime = GetServerWorldTimeSeconds();
 }
 
-// 권한 + 합법 전이 통과 시에만 복제 프로퍼티 기록
+// 페이즈는 서버만 바꾸고 복제 프로퍼티로 내려간다
 bool ADSTRGameState::AdvancePhase(const EDSTRMatchPhase NewPhase)
 {
 	if (!HasAuthority() || !IsValidPhaseTransition(MatchPhase, NewPhase))
@@ -53,6 +53,7 @@ bool ADSTRGameState::AdvancePhase(const EDSTRMatchPhase NewPhase)
 	}
 	MatchPhase = NewPhase;
 	UE_LOG(LogDSTR, Log, TEXT("DSTR_PHASE Phase=%s"), *GetPhaseDisplayName());
+	// 다음 복제 틱을 기다리지 않고 즉시 전송
 	ForceNetUpdate();
 	return true;
 }
