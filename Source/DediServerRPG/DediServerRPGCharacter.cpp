@@ -138,11 +138,24 @@ void ADediServerRPGCharacter::BeginPlay()
 		this,
 		[WeakThis = TWeakObjectPtr<ADediServerRPGCharacter>(this)]()
 	{
-		if (ADediServerRPGCharacter* Character = WeakThis.Get();
-			Character && !FDSTRVisualAssetRegistry::ApplyCharacterVisual(
-				*Character->GetMesh(), EDSTRVisualRole::Player))
+		ADediServerRPGCharacter* Character = WeakThis.Get();
+		if (!Character)
+		{
+			return;
+		}
+		if (!FDSTRVisualAssetRegistry::ApplyCharacterVisual(
+			*Character->GetMesh(), EDSTRVisualRole::Player))
 		{
 			UE_LOG(LogDSTR, Warning, TEXT("DSTR_PLAYER_VISUAL_MISSING Actor=%s"), *Character->GetName());
+			return;
+		}
+		// RepNotify may arrive before the mesh and AnimBP are ready.
+		// Reapply only the current state; an action already cleared must stay cleared.
+		if (Character->ReplicatedCombatAction.Action != EDSTRCombatAction::None)
+		{
+			Character->CurrentCombatAction = EDSTRCombatAction::None;
+			Character->CombatActionStartTime = -1.0;
+			Character->OnRep_CombatAction();
 		}
 	});
 }

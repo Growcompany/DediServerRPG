@@ -38,7 +38,7 @@ using namespace DSTRUIStyle;
 namespace
 {
 	const FLinearColor InputTextColor(0.04f, 0.07f, 0.11f, 1.0f);
-	const FLinearColor ReadyColor(0.18f, 0.85f, 0.48f, 1.0f);
+	const FLinearColor MenuReadyColor(0.18f, 0.85f, 0.48f, 1.0f);
 #if !UE_BUILD_SHIPPING
 	bool bQuickJoinSmokeConsumed = false;
 	bool bCreateRoomSmokeConsumed = false;
@@ -288,7 +288,7 @@ void UDSTRMainMenuWidget::UpdateRoomList()
 		RoomStateTexts[RowIndex]->SetText(FText::FromString(StateLabel));
 		const bool bCanJoin = !bJoining && !bQuerying && !bStale && Snapshot->CanJoin();
 		RoomStateTexts[RowIndex]->SetColorAndOpacity(FSlateColor(
-			bCanJoin ? ReadyColor
+			bCanJoin ? MenuReadyColor
 				: (Snapshot->Availability == EDSTRServerAvailability::NoResponse
 					|| Snapshot->Availability == EDSTRServerAvailability::Incompatible ? DangerColor : AccentColor)));
 		RoomJoinButtons[RowIndex]->SetIsEnabled(bCanJoin);

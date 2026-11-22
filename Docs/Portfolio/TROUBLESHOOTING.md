@@ -80,7 +80,9 @@ PlayerController가 생성됐더라도 PlayerState 복제와 클라이언트 비
 
 전투 액션이 AnimBP보다 먼저 도착한 경우에는 비주얼 적용 직후 현재 `ReplicatedCombatAction`을 다시 확인합니다. 활성 액션이 남아 있으면 로컬 재생 상태를 초기화하고 같은 `Action / Variant`를 적용합니다. 순간 RPC를 다시 보내지 않고 복제된 현재 상태에서 표현을 복구하므로 접속, PlayerState, 자산 로드의 도착 순서에 의존하지 않습니다.
 
-관련 코드: [`DSTRPlayerController.cpp`](../../Source/DediServerRPG/Private/Player/DSTRPlayerController.cpp), [`DediServerRPGGameMode.cpp`](../../Source/DediServerRPG/DediServerRPGGameMode.cpp), [`DSTREnemyCharacter.cpp`](../../Source/DediServerRPG/Private/Enemy/DSTREnemyCharacter.cpp)
+플레이어 회귀 테스트는 공격이 모델보다 먼저 온 경우, 모델이 먼저 온 경우, 로딩 중 공격이 끝난 경우를 재현합니다. 처음 두 경우에는 해당 몽타주가 재생되는지, 마지막 경우에는 끝난 공격이 다시 시작되지 않는지 검사합니다. UE 5.4 에디터에서 수정 전에는 공격이 먼저 온 경우만 실패했고, 수정 후에는 세 경우 모두 통과했습니다.
+
+[로비 준비 보고](../../Source/DediServerRPG/Private/Player/DSTRPlayerController.cpp) · [매치 시작 조건](../../Source/DediServerRPG/DediServerRPGGameMode.cpp) · [플레이어 모델 적용](../../Source/DediServerRPG/DediServerRPGCharacter.cpp) · [플레이어 회귀 테스트](../../Source/DediServerRPG/Private/Tests/DSTRPresentationTests.cpp) · [적 모델 적용](../../Source/DediServerRPG/Private/Enemy/DSTREnemyCharacter.cpp)
 
 ## 전송 방식 선택 기준
 
