@@ -6,7 +6,9 @@
 
 빈 프로세스는 생성할 자리이고, 플레이어가 이름을 정해 최종 Login까지 성공해야 방이 됩니다. PreLogin 검사는 상태를 바꾸지 않아 취소된 로딩이 방을 점유하지 않습니다. 생성 요청은 UTF-8 base64 이름과 GUID를 보내며, 동시 요청은 게임 스레드의 최종 Login 검사에서 하나만 확정합니다. 방 목록 JOIN도 GUID를 전달하므로 같은 포트의 다음 방에 잘못 입장하지 않습니다.
 
-GameState는 방 이름과 방장·준비·진행 상태를 복제합니다. 방장이 나가면 남은 플레이어에게 권한을 이전하고, 마지막 퇴장 시 해당 서버만 월드를 다시 열어 빈자리로 반환합니다. 상태 조회용 NetDriver는 참가자나 PlayerController를 만들지 않으며, 서버별 요청 수명과 응답 시각을 따로 관리합니다. 조회 중이거나 오래된 응답으로 생성/입장하지 않습니다.
+`GameState`는 방 이름, 방장 ID, 매치 페이즈를 복제합니다. 준비 여부는 각 `PlayerState`가 복제하며, 서버가 준비 인원을 집계합니다. 방장이 나가면 남은 플레이어에게 권한을 넘기고, 마지막 참가자가 나가면 해당 월드를 초기화합니다.
+
+방 목록은 상태 조회용 NetDriver로 갱신합니다. 조회는 참가자 슬롯을 점유하지 않으며, 클라이언트는 응답이 오래된 서버를 생성·입장 대상에서 제외합니다.
 
 ## 설계 목표
 
@@ -43,8 +45,10 @@ sequenceDiagram
     participant Ability as Gameplay Ability
     participant Server as Authority
     participant Target as Target ASC
+    participant GM as GameMode
     participant GS as GameState
     participant UI as Client HUD
+    participant VM as HUD ViewModel
 
     Client->>Character: Enhanced Input
     Character->>ASC: 입력 Gameplay Tag
@@ -52,9 +56,12 @@ sequenceDiagram
     Ability->>Server: 예측/검증된 실행
     Server->>Server: 거리·각도·상태 판정
     Server->>Target: Damage GameplayEffect
-    Target-->>GS: 다운·사망·진행 상태 반영
-    GS-->>UI: 복제 상태
-    UI->>UI: ViewModel로 표시 값 파생
+    opt 보스 처치
+        GM->>GS: Clear 전이
+        GS-->>UI: 매치 결과 복제
+        UI->>VM: 결과 표시 값 계산 요청
+        VM-->>UI: 결과 문구
+    end
 ```
 
 클라이언트는 조작과 예측 표현을 시작할 수 있지만 체력, 버프, 다운, 스폰 수, 매치 페이즈를 직접 확정하지 않습니다.
@@ -108,7 +115,7 @@ ASC와 AttributeSet은 Pawn이 아니라 `ADSTRPlayerState`에 있습니다. Paw
 - 성공 시 체력을 복구하고 2.5초 동안 `State.Invulnerable` 태그를 주는 GameplayEffect를 적용합니다.
 - 만료된 플레이어는 탈락 처리하며 살아 있는 파티원이 없으면 매치를 실패시킵니다.
 
-## 적 AI: BT/BB와 C++의 경계
+## 적 AI의 행동 선택
 
 적 AI는 서버에서만 실행합니다. Behavior Tree는 우선순위를, Blackboard는 현재 전투 문맥을 소유합니다.
 
@@ -121,15 +128,19 @@ flowchart TD
     Disabled -->|Yes| Hold[상태 유지]
     Disabled -->|No| Dormant{잠복 보스?}
     Dormant -->|Yes| Hold
-    Dormant -->|No| BossSkill{보스 기술 가능?}
+    Dormant -->|No| Active{기존 공격 진행 중?}
+    Active -->|Yes| Hold
+    Active -->|No| BossSkill{보스 기술 가능?}
     BossSkill -->|Yes| Activate[어빌리티 활성화]
-    BossSkill -->|No| Melee{근접 공격 가능?}
+    BossSkill -->|No| Melee{일반 적 근접 공격 가능?}
     Melee -->|Yes| Activate
-    Melee -->|No| Approach[대상 접근]
+    Melee -->|No| InRange{대상이 사거리 안?}
+    InRange -->|Yes| Recover[회복 대기]
+    InRange -->|No| Approach[대상이 있으면 접근]
 ```
 
 - Blackboard: 대상, 거리, 공격 가능 여부, 잠복·경직 상태 등 런타임 값
-- Behavior Tree: 사망 → 행동 불가 → 잠복 → 보스 기술 → 근접 공격 → 접근 순서
+- Behavior Tree는 사망·경직·잠복과 진행 중인 동작을 먼저 처리하고, 보스 기술·일반 적 근접 공격·거리 조절 순으로 판단합니다.
 - Service: 전투 문맥을 일정 주기로 갱신
 - Task: 접근, 공격 활성화, 상태 유지처럼 한 가지 작업 수행
 - C++ Rules: 위협도, 대상 유지 히스테리시스, 기술 선택과 거리 계산
@@ -141,18 +152,19 @@ BT/BB 에셋은 프로젝트 소유 에디터 C++ 작성 도구로 생성·검�
 ```mermaid
 stateDiagram-v2
     [*] --> WaitingForPlayers
-    WaitingForPlayers --> Wave: 파티 준비/자동 시작
+    WaitingForPlayers --> Wave: 전원 준비 후 방장 시작 요청 및 카운트다운 완료
     Wave --> Advance: 웨이브 종료 + 유효 경로
     Wave --> Boss: 웨이브 종료 + 경로 없음
     Advance --> Boss: 관문 진입/보스 기상
     Boss --> Clear: 보스 처치
-    WaitingForPlayers --> Failed: 치명 조건
-    Wave --> Failed: 전멸/정체
+    Wave --> Failed: 전멸·진행 정체·웨이브 스폰 실패
     Advance --> Failed: 전멸/정체
     Boss --> Failed: 전멸/정체
 ```
 
-`GameMode`가 상태를 바꾸고 `GameState`가 화면에 필요한 결과만 복제합니다. HUD 전용 RPC를 따로 두지 않아 늦게 접속한 클라이언트도 현재 복제 상태에서 화면을 재구성할 수 있습니다.
+`GameMode`가 전이를 요청하면 `GameState`가 허용된 전이인지 검사하고 결과를 복제합니다. 참가 중인 클라이언트는 최신 상태에서 HUD를 구성합니다. 서버는 카운트다운이 시작된 뒤로는 새 참가자를 받지 않습니다.
+
+개발 빌드의 `-DSTRAutoStart` 옵션은 전원 준비 조건을 확인한 뒤 방장 입력 없이 카운트다운을 시작합니다.
 
 ## 애니메이션과 전투 액션 복제
 
@@ -202,7 +214,7 @@ Greystone과 Sevarog용 프로젝트 AnimBP는 로코모션 결과와 최종 포
 
 ## UI와 복제 상태
 
-HUD는 `GameState`와 `PlayerState`를 읽는 ViewModel을 거쳐 표시 값을 만듭니다.
+HUD 위젯이 `GameState`와 `PlayerState`를 읽습니다. 예를 들어 위젯이 파티원의 체력과 다운 상태를 모으면, `FDSTRHUDViewModel::FormatPartyRow`가 한 줄의 표시 문구를 만듭니다.
 
 - 로비 인원/준비 상태
 - 현재 페이즈와 목표

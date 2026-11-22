@@ -1,6 +1,8 @@
 # DediServerRPG
 
-Unreal Engine 5.4와 C++로 만든 1~4인 3인칭 협동 액션 포트폴리오입니다. 전용 서버 권한, Gameplay Ability System(GAS), Behavior Tree/Blackboard, 복제 UI를 한 판의 흐름으로 연결하는 데 초점을 맞췄습니다.
+Unreal Engine 5.4와 C++로 1인 개발한 1~4인 협동 액션 RPG입니다. 플레이어가 방을 만들고 보스를 쓰러뜨릴 때까지, 전용 서버가 GAS 전투 판정과 매치 진행을 담당합니다.
+
+[2인 플레이 영상 · 1분 33초](https://youtu.be/GlUsXTzRKXw) · [기술 포트폴리오 · Notion](https://cookie-roquefort-35d.notion.site/DediServerRPG-Dedicated-Server-GAS-RPG-3c76907ae0ce804bb8f6d9810b51b395)
 
 > 이 저장소는 코드 검토용 공개본입니다. 상용 에셋의 재배포를 피하기 위해 `Content`, `Config`, 프로젝트 파일과 제작 스크립트는 포함하지 않으며, 저장소만으로 게임을 실행할 수는 없습니다.
 
@@ -23,31 +25,25 @@ Unreal Engine 5.4와 C++로 만든 1~4인 3인칭 협동 액션 포트폴리오�
 - 적의 의사결정과 런타임 상태는 Behavior Tree/Blackboard가 담당하고, 판정 규칙과 원자적 동작만 C++로 구성했습니다.
 - Dedicated Server는 메시·애니메이션·FX·SFX를 로드하지 않습니다. 클라이언트 표현 자산은 비동기 프리로드합니다.
 - 지속 상태는 GameplayEffect/Gameplay Cue 또는 RepNotify로 전달하고, 일회성 타격 피드백만 unreliable multicast로 분리했습니다.
-- `GameState`의 복제 상태를 HUD ViewModel이 읽도록 해 게임 규칙과 화면 구성을 분리했습니다.
-- 4개 클라이언트 프로세스가 실제 입력 태그와 컨트롤 회전을 사용하는 E2E 드라이버로 전체 매치 흐름을 반복 검증했습니다.
+- HUD 위젯은 `GameState`와 `PlayerState`의 복제 값을 읽고, ViewModel은 그 값으로 목표 문구와 파티원 표시를 계산합니다.
+- 로컬 전용 서버에서 자동 입력 클라이언트 4개가 모두 보스 클리어를 수신했습니다. 한 클라이언트에는 지연 150ms와 패킷 손실 5%를 설정했습니다.
 
 ## 전체 구조
 
 ```mermaid
 flowchart LR
-    Input[Enhanced Input] --> Character[Player Character]
-    Character --> ASC[PlayerState ASC]
-    ASC --> Ability[Gameplay Ability]
-    Ability --> Combat[Combat Library]
-    Combat --> GE[Damage GameplayEffect]
-    GE --> Attribute[AttributeSet]
+    Input[플레이어 입력] --> PlayerASC[PlayerState의 ASC]
+    AI[서버 Behavior Tree] --> Task[공격 Task]
+    Task --> EnemyASC[적 캐릭터의 ASC]
+    PlayerASC --> Ability[공격 어빌리티]
+    EnemyASC --> Ability
+    Ability -->|서버 타격 판정| Damage[Damage GameplayEffect]
+    Damage --> HP[대상 AttributeSet의 체력]
 
-    BT[Behavior Tree] --> BB[Blackboard]
-    BB --> AITask[C++ Task / Rule]
-    AITask --> ASC
-
-    Attribute --> GameMode[Server GameMode]
-    GameMode --> GameState[Replicated GameState]
-    GameState --> ViewModel[HUD ViewModel]
-    ViewModel --> HUD[UMG HUD]
-
-    Ability --> Action[Action / Sequence / Variant]
-    Action --> AnimBP[Client AnimBP FullBody Slot]
+    GM[서버 GameMode] -->|매치 진행| GS[GameState]
+    GS -->|페이즈와 목표| HUD[클라이언트 HUD 위젯]
+    PS[PlayerState] -->|준비와 파티원 상태| HUD
+    HUD -->|표시 값 계산 요청| VM[HUD ViewModel]
 ```
 
 매치 상태는 서버에서 다음과 같이 전이합니다.
@@ -109,5 +105,3 @@ Multicast만으로 공격을 알리면 늦게 관련성을 얻은 클라이언�
 ## 저장소 범위
 
 전체 `Source`와 공개 기술 문서만 포함합니다. 상용/Fab 자산, 맵, 제작 스크립트와 빌드 결과물은 제외했습니다.
-
-추가 설계 배경과 제작 기록은 [Notion 포트폴리오](https://cookie-roquefort-35d.notion.site/DediServerRPG-Dedicated-Server-GAS-RPG-3c76907ae0ce804bb8f6d9810b51b395)에 정리되어 있습니다.
